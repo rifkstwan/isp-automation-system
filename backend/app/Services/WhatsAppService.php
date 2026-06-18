@@ -10,6 +10,14 @@ class WhatsAppService
 {
     /**
      * Send a WhatsApp message using the configured API settings.
+     * 
+     * Mendukung provider:
+     * - Fonnte (https://fonnte.com) — Default, gunakan wa_api_url = https://api.fonnte.com/send
+     * - Wablas (https://wablas.com) — Gunakan wa_api_url = https://pati.wablas.com/api/send-message
+     * 
+     * Konfigurasi dilakukan melalui tabel settings:
+     * - wa_api_url: URL endpoint API provider
+     * - wa_api_key: Token/API Key dari provider
      */
     public static function sendMessage(string $phone, string $message): bool
     {
@@ -21,18 +29,76 @@ class WhatsAppService
         $apiKey = Setting::where('key', 'wa_api_key')->value('value');
 
         if (empty($apiUrl) || empty($apiKey)) {
-            Log::channel('single')->warning('WhatsApp API URL or Key is not configured. Simulated logging only.');
+            Log::channel('single')->warning('WhatsApp API URL or Key is not configured. Message logged only.');
             return false;
         }
 
         try {
-            // Simulated API Call
-            Log::channel('single')->info('Simulated sending via API ' . $apiUrl . ' with Token ' . substr($apiKey, 0, 5) . '***');
-            return true;
+            // Deteksi provider berdasarkan URL
+            if (str_contains($apiUrl, 'fonnte.com')) {
+                // === FONNTE API ===
+                // Docs: https://docs.fonnte.com/
+                $response = Http::withHeaders([
+                    'Authorization' => $apiKey,
+                ])->post($apiUrl, [
+                    'target'  => self::formatPhone($phone),
+                    'message' => $message,
+                    'countryCode' => '62', // Indonesia
+                ]);
+            } elseif (str_contains($apiUrl, 'wablas.com')) {
+                // === WABLAS API ===
+                // Docs: https://docs.wablas.com/
+                $response = Http::withHeaders([
+                    'Authorization' => $apiKey,
+                ])->post($apiUrl, [
+                    'phone'   => self::formatPhone($phone),
+                    'message' => $message,
+                ]);
+            } else {
+                // === GENERIC API ===
+                // Format standar untuk provider lainnya
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                ])->post($apiUrl, [
+                    'phone'   => self::formatPhone($phone),
+                    'message' => $message,
+                ]);
+            }
+
+            if ($response->successful()) {
+                Log::channel('single')->info('WhatsApp message sent successfully via ' . $apiUrl);
+                Log::channel('single')->info('Response: ' . $response->body());
+                return true;
+            } else {
+                Log::channel('single')->error('WhatsApp API returned error: ' . $response->status() . ' - ' . $response->body());
+                return false;
+            }
         } catch (\Exception $e) {
             Log::channel('single')->error('Exception during WhatsApp sending: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Format nomor telepon ke format internasional (62xxx).
+     * Mengubah format 08xx menjadi 628xx.
+     */
+    private static function formatPhone(string $phone): string
+    {
+        // Hapus spasi, strip, dan karakter non-digit
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        
+        // Konversi 08xx → 628xx
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        }
+        
+        // Konversi +62 → 62 (jika ada prefix +)
+        if (str_starts_with($phone, '+')) {
+            $phone = substr($phone, 1);
+        }
+
+        return $phone;
     }
 
     /**
@@ -59,7 +125,7 @@ class WhatsAppService
         $formattedPrice = "Rp " . number_format($paket->harga, 0, ',', '.');
         $message = "Halo {$user->name}, terima kasih telah melakukan pemesanan paket WiFi!\n\n"
                  . "Detail Pesanan:\n"
-                 . "- Paket: {$paket->nama_paket}\n"
+                 . "- Paket: {$paket->nama}\n"
                  . "- Harga: {$formattedPrice}/bulan\n"
                  . "- Status: {$order->status}\n\n"
                  . "Pesanan Anda sedang kami proses. Teknisi kami akan segera menghubungi Anda untuk jadwal pemasangan.";
@@ -114,6 +180,23 @@ class WhatsAppService
         } else {
             $message .= "Tim kami sedang berusaha menangani kendala Anda secepat mungkin.";
         }
+
+        self::sendMessage($user->phone, $message);
+    }
+
+    /**
+     * Send a suspend/isolation notification to the user.
+     */
+    public static function sendSuspendNotification($user, $billing)
+    {
+        if (empty($user->phone)) return;
+
+        $formattedTotal = "Rp " . number_format($billing->jumlah_tagihan, 0, ',', '.');
+
+        $message = "Halo {$user->name},\n\n"
+                 . "Layanan internet Anda sementara *DIISOLIR* karena tagihan sebesar {$formattedTotal} telah melewati tanggal jatuh tempo.\n\n"
+                 . "Segera lunasi tagihan Anda agar koneksi internet dapat aktif kembali.\n"
+                 . "Hubungi admin jika memerlukan bantuan.";
 
         self::sendMessage($user->phone, $message);
     }

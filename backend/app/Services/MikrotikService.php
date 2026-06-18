@@ -152,4 +152,58 @@ class MikrotikService
             return false;
         }
     }
+
+    /**
+     * Update PPPoE secret profile ketika pelanggan upgrade paket.
+     * Profile di MikroTik biasanya mengatur bandwidth limit (rate-limit).
+     *
+     * @param string $username  Username PPPoE pelanggan
+     * @param string $newProfile  Nama profile baru (sesuai nama paket, misal: 'Paket Premium')
+     * @return bool
+     */
+    public function updatePppoeProfile(string $username, string $newProfile): bool
+    {
+        if (!$this->client) return false;
+        if ($this->client === 'DEMO_MODE') {
+            Log::info("DEMO MOCK: Updated PPPoE Profile for {$username} to '{$newProfile}'");
+            return true;
+        }
+
+        try {
+            // Cari PPPoE secret berdasarkan username
+            $query = new Query('/ppp/secret/print');
+            $query->where('name', $username);
+            $secrets = $this->client->query($query)->read();
+
+            if (!empty($secrets) && isset($secrets[0]['.id'])) {
+                // Update profile pada PPPoE secret
+                $updateQuery = new Query('/ppp/secret/set');
+                $updateQuery->equal('.id', $secrets[0]['.id'])
+                            ->equal('profile', $newProfile);
+                $this->client->query($updateQuery)->read();
+
+                // Disconnect koneksi aktif agar profile baru langsung berlaku
+                // Pelanggan akan otomatis reconnect dengan profile/bandwidth baru
+                $activeQuery = new Query('/ppp/active/print');
+                $activeQuery->where('name', $username);
+                $activeConnections = $this->client->query($activeQuery)->read();
+                if (!empty($activeConnections)) {
+                    foreach ($activeConnections as $active) {
+                        $removeQuery = new Query('/ppp/active/remove');
+                        $removeQuery->equal('.id', $active['.id']);
+                        $this->client->query($removeQuery)->read();
+                    }
+                }
+
+                Log::info("Mikrotik: PPPoE Profile updated for {$username} to '{$newProfile}'");
+                return true;
+            }
+
+            Log::warning("Mikrotik: PPPoE secret not found for username '{$username}'");
+            return false;
+        } catch (\Exception $e) {
+            Log::error('Mikrotik updatePppoeProfile Failed: ' . $e->getMessage());
+            return false;
+        }
+    }
 }

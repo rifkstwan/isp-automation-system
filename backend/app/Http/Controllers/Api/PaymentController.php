@@ -210,6 +210,15 @@ class PaymentController extends Controller
                 $billing->status = 'paid';
                 $billing->tanggal_bayar = now();
 
+                // Perpanjang tanggal_selesai pada order
+                if ($billing->order) {
+                    $order = $billing->order;
+                    $order->status = 'aktif'; // Kembalikan status ke aktif jika sebelumnya suspend
+                    // Tambahkan 30 hari dari sekarang atau dari tanggal_selesai sebelumnya (pilih dari sekarang agar full 30 hari setelah bayar)
+                    $order->tanggal_selesai = now()->addDays($order->paket->durasi ?? 30);
+                    $order->save();
+                }
+
                 // Enable PPPoE User if exists
                 if ($billing->order && $billing->order->mikrotik_username) {
                     $mikrotikService = new \App\Services\MikrotikService();
@@ -271,6 +280,13 @@ class PaymentController extends Controller
 
         $billing->status = 'paid';
         $billing->tanggal_bayar = now();
+
+        if ($billing->order) {
+            $order = $billing->order;
+            $order->status = 'aktif';
+            $order->tanggal_selesai = now()->addDays($order->paket->durasi ?? 30);
+            $order->save();
+        }
 
         if ($billing->order && $billing->order->mikrotik_username) {
             $mikrotikService = new \App\Services\MikrotikService();

@@ -81,7 +81,7 @@ class NetworkDeviceController extends Controller
             
             // Check if this device belongs to an unpaid order (Heuristic for Demo)
             $isUnpaid = false;
-            $pendingOrders = \App\Models\Order::with('user')->whereIn('status', ['pending', 'menunggu_pembayaran'])->get();
+            $pendingOrders = \App\Models\Order::with('user')->whereIn('status', ['pending', 'suspend'])->get();
             foreach ($pendingOrders as $pending) {
                 if ($pending->user && str_contains($device->name, $pending->user->name)) {
                     $isUnpaid = true;
@@ -102,7 +102,16 @@ class NetworkDeviceController extends Controller
             // PROACTIVE NOC DEMO: If IP ends in .99, it means the fiber is cut!
             $isProactiveOutage = str_ends_with($ip, '.99');
             
-            if ($isUnpaid || $hasTicket || $isProactiveOutage) {
+            if ($isUnpaid) {
+                $status = 'terisolir';
+                $device->status = 'terisolir';
+                $device->save();
+                
+                $uptime = '-';
+                $cpu = 0;
+                $memory = 0;
+                $clients = 0;
+            } else if ($hasTicket || $isProactiveOutage) {
                 $status = 'offline';
                 $device->status = 'offline';
                 $device->save();

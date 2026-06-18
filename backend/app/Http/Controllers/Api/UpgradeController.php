@@ -105,10 +105,16 @@ class UpgradeController extends Controller
                 'total_harga' => $newPaket->harga,
             ]);
 
-            // TODO: Integrasi Mikrotik RouterOS API
-            // Ini adalah tempat (placeholder) untuk menambahkan skrip API RouterOS
-            // agar melimitasi Simple Queue atau PPPoE Profile klien berubah otomatis.
-            // Contoh: RouterOS::client()->setProfile($order->ip_address, $newPaket->nama);
+            // Integrasi Mikrotik RouterOS API — Update PPPoE Profile
+            // Mengubah profile PPPoE pelanggan di router agar bandwidth limit sesuai paket baru
+            if ($order->mikrotik_username) {
+                try {
+                    $mikrotik = new \App\Services\MikrotikService();
+                    $mikrotik->updatePppoeProfile($order->mikrotik_username, $newPaket->nama);
+                } catch (\Exception $e) {
+                    \Log::error('Gagal update PPPoE profile saat upgrade: ' . $e->getMessage());
+                }
+            }
         }
 
         $upgradeRequest->load(['user', 'order', 'oldPaket', 'newPaket']);

@@ -74,6 +74,7 @@ export function AdminNetworkPage() {
     switch (status) {
       case "online": return "bg-emerald-50 text-emerald-600 border-emerald-200"
       case "offline": return "bg-red-50 text-red-600 border-red-200"
+      case "terisolir": return "bg-rose-50 text-rose-600 border-rose-200"
       case "warning": return "bg-amber-50 text-amber-600 border-amber-200"
       default: return "bg-slate-50 text-slate-600 border-slate-200"
     }
@@ -83,6 +84,7 @@ export function AdminNetworkPage() {
     switch (status) {
       case "online": return <CheckCircle2 className="w-4 h-4 text-emerald-500" />
       case "offline": return <XCircle className="w-4 h-4 text-red-500" />
+      case "terisolir": return <AlertTriangle className="w-4 h-4 text-rose-500" />
       case "warning": return <AlertTriangle className="w-4 h-4 text-amber-500" />
       default: return null
     }

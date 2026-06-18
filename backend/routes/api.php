@@ -124,6 +124,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Settings
         Route::get('/settings', [App\Http\Controllers\Api\SettingController::class, 'index']);
         Route::post('/settings', [App\Http\Controllers\Api\SettingController::class, 'update']);
+
+        // Manual Billing Scheduler Trigger (untuk demo & pengujian)
+        Route::post('/admin/billing/generate', [BillingController::class, 'triggerGenerate']);
+        Route::post('/admin/billing/check-overdue', [BillingController::class, 'triggerCheckOverdue']);
     });
 
     // Users overview (moved from owner)

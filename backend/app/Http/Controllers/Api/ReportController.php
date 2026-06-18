@@ -112,7 +112,7 @@ class ReportController extends Controller
             ->mapWithKeys(fn($row) => [$row->status => $row->total]);
 
         // Tambahan untuk Dashboard Admin
-        $pelangganSuspend = Order::where('status', 'ditolak')->count(); // Asumsikan ditolak/suspend
+        $pelangganSuspend = Order::where('status', 'suspend')->count();
 
         $tiketAktif = Ticket::whereNotIn('status', ['selesai', 'ditutup'])->count();
 
