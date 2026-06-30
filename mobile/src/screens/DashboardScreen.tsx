@@ -48,6 +48,7 @@ export default function DashboardScreen() {
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
   const [currentPaket, setCurrentPaket] = useState<any>(null);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
 
   // Upgrade Modal State
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
@@ -86,7 +87,7 @@ export default function DashboardScreen() {
       // Orders
       try {
         const ordersRes = await apiClient.get('/orders/my');
-        const activeOrders = ordersRes.data?.filter((o: any) => o.status === 'aktif');
+        const activeOrders = ordersRes.data?.filter((o: any) => o.status === 'aktif' || o.status === 'dibayar');
         if (activeOrders && activeOrders.length > 0) {
           setHasActiveOrder(true);
           setOrderId(activeOrders[0].id);
@@ -96,8 +97,12 @@ export default function DashboardScreen() {
           setOrderId(null);
           setCurrentPaket(null);
         }
+
+        const pendingList = ordersRes.data?.filter((o: any) => o.status === 'pending') || [];
+        setPendingOrder(pendingList.length > 0 ? pendingList[0] : null);
       } catch (e) {
         setHasActiveOrder(false);
+        setPendingOrder(null);
       }
 
       // Notifications
@@ -432,8 +437,10 @@ export default function DashboardScreen() {
                   <View>
                     <Text style={styles.premiumSubtext}>Status Koneksi</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                      <View style={[styles.statusLiveDot, { backgroundColor: '#34d399' }]} />
-                      <Text style={{ color: '#34d399', fontSize: 14, fontWeight: '800' }}>ONLINE</Text>
+                      <View style={[styles.statusLiveDot, { backgroundColor: '#60a5fa' }]} />
+                      <Text style={{ color: '#60a5fa', fontSize: 14, fontWeight: '800' }}>
+                        AKTIF / PEMASANGAN
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -541,6 +548,25 @@ export default function DashboardScreen() {
                   <Text style={styles.stickyBillingBtnText}>Bayar via Midtrans</Text>
                 </>
               )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* STICKY INSTALLATION NOTIFICATION BAR (Appears if there's a pending installation order) */}
+      {pendingOrder && !tagihan && activeTab === 'Home' && (
+        <View style={styles.stickyBillingNav}>
+          <View style={[styles.stickyBillingContent, { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stickyBillingTitle}>Bayar Instalasi Baru</Text>
+              <Text style={styles.stickyBillingAmount}>{formatRupiah(pendingOrder.total_harga)}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.stickyBillingBtn} 
+              onPress={() => navigation.navigate('OrderHistory')}
+            >
+              <Ionicons name="card" size={18} color="#f59e0b" />
+              <Text style={[styles.stickyBillingBtnText, { color: '#f59e0b' }]}>Bayar Sekarang</Text>
             </TouchableOpacity>
           </View>
         </View>

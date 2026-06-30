@@ -39,7 +39,8 @@ export default function OrderScreen() {
 
       // Check active orders to determine if this is Upgrade or New Install
       const ordersRes = await apiClient.get('/orders/my');
-      const active = ordersRes.data?.find((o: any) => o.status === 'aktif' || o.status === 'pending');
+      const pending = ordersRes.data?.filter((o: any) => o.status === 'pending') || [];
+      const active = ordersRes.data?.find((o: any) => o.status === 'aktif' || o.status === 'pending' || o.status === 'dibayar');
       setActiveOrder(active);
     } catch (error) {
       console.error('Error fetching order data:', error);
@@ -88,7 +89,7 @@ export default function OrderScreen() {
         Alert.alert('Sukses', 'Pemesanan berhasil. Tim teknisi kami akan segera menjadwalkan pemasangan.');
       }
       setModalVisible(false);
-      navigation.goBack();
+      navigation.navigate('OrderHistory');
     } catch (error: any) {
       Alert.alert('Gagal', error.response?.data?.message || 'Terjadi kesalahan saat memproses pesanan.');
     } finally {

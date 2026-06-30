@@ -1,0 +1,62 @@
+{
+    "login": {
+        "token": "1|realTokenExample123456789",
+        "user": {
+            "id": 1,
+            "name": "Test User",
+            "email": "test@example.com",
+            "email_verified_at": "2026-06-04T06:00:07.000000Z",
+            "created_at": "2026-06-04T06:00:08.000000Z",
+            "updated_at": "2026-06-04T06:00:08.000000Z",
+            "avatar": null,
+            "phone": null,
+            "address": null,
+            "email_notif": true,
+            "wa_notif": true,
+            "avatar_url": null,
+            "roles": []
+        }
+    },
+    "pakets": [
+        {
+            "id": 1,
+            "nama": "Paket Basic",
+            "deskripsi": "Cocok untuk penggunaan sehari-hari browsing dan sosmed",
+            "kecepatan": 10,
+            "harga": 100000,
+            "durasi": 30,
+            "is_aktif": true,
+            "created_at": "2026-06-04T06:37:50.000000Z",
+            "updated_at": "2026-06-10T10:32:08.000000Z",
+            "fup": null
+        },
+        {
+            "id": 2,
+            "nama": "Paket Standard",
+            "deskripsi": "Ideal untuk streaming dan WFH ringan",
+            "kecepatan": 25,
+            "harga": 150000,
+            "durasi": 30,
+            "is_aktif": true,
+            "created_at": "2026-06-04T06:37:50.000000Z",
+            "updated_at": "2026-06-10T10:32:15.000000Z",
+            "fup": null
+        }
+    ],
+    "report": {
+        "total_pendapatan": 0,
+        "pendapatan_bulan_ini": 0,
+        "pelanggan_aktif": 3,
+        "total_order": 2,
+        "order_pending": 0,
+        "tiket_aktif": 0,
+        "paket_terlaris": [
+            "Paket 20 Mbps",
+            "Paket 30 Mbps"
+        ],
+        "pendapatan_per_bulan": {
+            "Januari": 1500000,
+            "Februari": 2000000
+        }
+    }
+}

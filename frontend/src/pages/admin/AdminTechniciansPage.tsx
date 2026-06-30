@@ -51,7 +51,7 @@ export function AdminTechniciansPage() {
 
   // Ambil tiket & order yang belum diselesaikan
   const pendingTickets = tickets.filter(t => t.status === "menunggu")
-  const activeOrders = orders.filter((o: any) => o.status === "pending" || o.status === "aktif")
+  const activeOrders = orders.filter((o: any) => o.status === "pending" || o.status === "dibayar" || o.status === "aktif")
 
   const filteredSchedules = schedules.filter((s: any) => {
     return s.nama_teknisi.toLowerCase().includes(scheduleSearchTerm.toLowerCase()) || 

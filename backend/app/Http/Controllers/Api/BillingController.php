@@ -19,8 +19,8 @@ class BillingController extends Controller
 
     public function myBillings()
     {
-        $billings = Billing::with(['order.paket'])
-            ->where('user_id', auth()->user()->id)
+        $billings = Billing::with(['order.paket', 'user'])
+            ->where('user_id', auth()->id())
             ->orderBy('created_at', 'desc')
             ->get();
         return response()->json($billings);

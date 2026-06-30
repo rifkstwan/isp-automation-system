@@ -14,6 +14,7 @@ function formatRupiah(angka: number) {
 
 const statusConfig = {
   pending:  { label: "Menunggu",  color: "bg-amber-50 text-amber-600 border-amber-200" },
+  dibayar:  { label: "Menunggu Pemasangan", color: "bg-blue-50 text-blue-600 border-blue-200" },
   aktif:    { label: "Aktif",     color: "bg-emerald-50 text-emerald-600 border-emerald-200" },
   suspend:  { label: "Suspend",   color: "bg-red-50 text-red-600 border-red-200" },
   ditolak:  { label: "Ditolak",   color: "bg-slate-100 text-slate-500 border-slate-300" },
@@ -162,7 +163,8 @@ export function AdminOrdersPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="semua">Semua Status</option>
-            <option value="pending">Menunggu</option>
+            <option value="pending">Menunggu Pembayaran</option>
+            <option value="dibayar">Menunggu Pemasangan</option>
             <option value="aktif">Aktif</option>
             <option value="suspend">Suspend</option>
             <option value="selesai">Selesai</option>

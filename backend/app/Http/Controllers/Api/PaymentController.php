@@ -178,23 +178,7 @@ class PaymentController extends Controller
             if (!$order) return response()->json(['message' => 'Order not found'], 404);
 
             if ($isSuccess) {
-                $order->status = 'aktif';
-                $order->tanggal_mulai = now();
-                $order->tanggal_selesai = now()->addDays($order->paket->durasi ?? 30);
-                
-                // Add PPPoE User
-                $mikrotikService = new \App\Services\MikrotikService();
-                $username = 'user_' . $order->user_id . '_' . rand(100, 999);
-                $password = \Illuminate\Support\Str::random(8);
-                $comment = 'Order ID: ' . $order->id . ' - ' . ($order->user->name ?? 'Unknown');
-                
-                if ($mikrotikService->addPppoeSecret($username, $password, 'default', $comment)) {
-                    $order->mikrotik_username = $username;
-                    $order->mikrotik_password = $password;
-                    if ($device = $mikrotikService->getDevice()) {
-                        $order->network_device_id = $device->id;
-                    }
-                }
+                $order->status = 'dibayar';
             } else if ($isFailed) {
                 $order->status = 'ditolak';
             } else if ($transactionStatus == 'pending') {
@@ -251,22 +235,7 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Order already processed'], 400);
         }
 
-        $order->status = 'aktif';
-        $order->tanggal_mulai = now();
-        $order->tanggal_selesai = now()->addDays($order->paket->durasi ?? 30);
-        
-        $mikrotikService = new \App\Services\MikrotikService();
-        $username = 'user_' . $order->user_id . '_' . rand(100, 999);
-        $password = \Illuminate\Support\Str::random(8);
-        $comment = 'Order ID: ' . $order->id . ' - ' . ($order->user->name ?? 'Unknown');
-        
-        if ($mikrotikService->addPppoeSecret($username, $password, 'default', $comment)) {
-            $order->mikrotik_username = $username;
-            $order->mikrotik_password = $password;
-            if ($device = $mikrotikService->getDevice()) {
-                $order->network_device_id = $device->id;
-            }
-        }
+        $order->status = 'dibayar';
         $order->save();
         return response()->json(['message' => 'Demo order payment success']);
     }

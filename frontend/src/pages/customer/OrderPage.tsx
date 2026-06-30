@@ -33,7 +33,7 @@ export function OrderPage() {
     if (!alamat) return setError("Alamat instalasi wajib diisi")
     try {
       await createOrder.mutateAsync({ paket_id: paketId, alamat, catatan })
-      navigate("/dashboard/billing")
+      navigate("/dashboard/orders")
     } catch (err: any) {
       setError(err.response?.data?.message || "Gagal membuat order")
     }

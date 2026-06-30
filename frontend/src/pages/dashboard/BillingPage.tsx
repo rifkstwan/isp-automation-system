@@ -20,6 +20,19 @@ export function BillingPage() {
     refetchInterval: 5000,
   })
 
+  // Fetch All Orders
+  const { data: allOrders = [], refetch: refetchOrders } = useQuery({
+    queryKey: ["all-orders"],
+    queryFn: async () => {
+      const res = await api.get("/orders/my")
+      return res.data || []
+    },
+    refetchInterval: 5000,
+  })
+
+  const pendingOrders = allOrders.filter((o: any) => o.status === 'pending');
+  const paidOrders = allOrders.filter((o: any) => ['dibayar', 'aktif', 'selesai', 'suspend'].includes(o.status));
+
   const formatRupiah = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount)
   }
@@ -31,27 +44,29 @@ export function BillingPage() {
   const { isReady: isMidtransReady } = useMidtrans()
   const [isPaying, setIsPaying] = useState<number | null>(null)
 
-  const handlePayment = async (billingId: number) => {
+  const handlePayment = async (id: number, isOrder = false) => {
     try {
-      setIsPaying(billingId)
+      setIsPaying(isOrder ? -id : id) // use negative for order to differentiate state if needed, but let's just use it
       // Call endpoint for Billing token
-      const res = await api.post(`/billings/${billingId}/pay`)
+      const res = await api.post(isOrder ? `/orders/${id}/pay` : `/billings/${id}/pay`)
       const snapToken = res.data.snap_token
 
       // @ts-ignore
       window.snap.pay(snapToken, {
         onSuccess: async function () {
           try {
-            await api.post(`/billings/${billingId}/demo-pay-success`)
+            await api.post(isOrder ? `/orders/${id}/demo-pay-success` : `/billings/${id}/demo-pay-success`)
           } catch (e) {
             console.error(e)
           }
           alert("Pembayaran berhasil!");
           refetch();
+          refetchOrders();
         },
         onPending: function () {
           alert("Menunggu pembayaran Anda!");
           refetch();
+          refetchOrders();
         },
         onError: function () {
           alert("Pembayaran gagal!");
@@ -68,8 +83,9 @@ export function BillingPage() {
     }
   }
 
-  const handleDownloadInvoice = (billing: any) => {
+  const handleDownloadInvoice = (item: any) => {
     const doc = new jsPDF()
+    const isOrder = item.isOrder
 
     doc.setFont("helvetica", "bold")
     doc.setFontSize(24)
@@ -96,20 +112,16 @@ export function BillingPage() {
     doc.text("Jatuh Tempo", 150, 42)
     doc.text("Status", 150, 47)
 
+    const invNumber = isOrder ? `ORD-${String(item.id).padStart(5, '0')}` : `INV-${String(item.id).padStart(5, '0')}`
+    
     doc.setFont("helvetica", "normal")
-    doc.text(`: INV-${String(billing.id).padStart(5, '0')}`, 175, 32)
-    doc.text(`: ${formatDate(billing.created_at)}`, 175, 37)
-    doc.text(`: ${formatDate(billing.jatuh_tempo)}`, 175, 42)
+    doc.text(`: ${invNumber}`, 175, 32)
+    doc.text(`: ${formatDate(item.created_at)}`, 175, 37)
+    doc.text(`: ${formatDate(isOrder ? item.created_at : item.jatuh_tempo)}`, 175, 42)
 
-    if (billing.status === 'paid') {
-      doc.setTextColor(34, 197, 94)
-      doc.setFont("helvetica", "bold")
-      doc.text(": LUNAS", 175, 47)
-    } else {
-      doc.setTextColor(239, 68, 68)
-      doc.setFont("helvetica", "bold")
-      doc.text(`: BELUM LUNAS`, 175, 47)
-    }
+    doc.setTextColor(34, 197, 94)
+    doc.setFont("helvetica", "bold")
+    doc.text(": LUNAS", 175, 47)
 
     doc.setDrawColor(226, 232, 240)
     doc.setLineWidth(0.5)
@@ -137,9 +149,9 @@ export function BillingPage() {
       head: [['Deskripsi Tagihan', 'ID Langganan', 'Nominal']],
       body: [
         [
-          `Tagihan Bulanan: ${billing.order?.paket?.nama || "Paket Internet"}`,
-          `#${billing.order_id}`,
-          formatRupiah(billing.jumlah_tagihan)
+          isOrder ? `Biaya Pemasangan: ${item.paket?.nama || "Instalasi Baru"}` : `Tagihan Bulanan: ${item.order?.paket?.nama || "Paket Internet"}`,
+          isOrder ? `-` : `#${item.order_id}`,
+          formatRupiah(isOrder ? item.total_harga : item.jumlah_tagihan)
         ],
       ],
       headStyles: {
@@ -177,14 +189,14 @@ export function BillingPage() {
     doc.text("Subtotal", 125, finalY + 13)
     doc.text("PPN (11%)", 125, finalY + 20)
 
-    doc.text(formatRupiah(billing.jumlah_tagihan), 191, finalY + 13, { align: "right" })
+    doc.text(formatRupiah(isOrder ? item.total_harga : item.jumlah_tagihan), 191, finalY + 13, { align: "right" })
     doc.text("Termasuk", 191, finalY + 20, { align: "right" })
 
     doc.setFont("helvetica", "bold")
     doc.setFontSize(12)
     doc.setTextColor(30, 41, 59)
     doc.text("Total Tagihan", 125, finalY + 29)
-    doc.text(formatRupiah(billing.jumlah_tagihan), 191, finalY + 29, { align: "right" })
+    doc.text(formatRupiah(isOrder ? item.total_harga : item.jumlah_tagihan), 191, finalY + 29, { align: "right" })
 
     doc.setFont("helvetica", "normal")
     doc.setFontSize(9)
@@ -199,11 +211,25 @@ export function BillingPage() {
     doc.setTextColor(200, 200, 200)
     doc.text("Terima kasih telah mempercayakan konektivitas Anda kepada kami.", 105, 280, { align: "center" })
 
-    doc.save(`Invoice_Tagihan_INV-${String(billing.id).padStart(5, '0')}.pdf`)
+    doc.save(`Invoice_Tagihan_${invNumber}.pdf`)
   }
 
   const unpaidBillings = billings.filter((b: any) => b.status === "unpaid" || b.status === "overdue")
-  const paidBillings = billings.filter((b: any) => b.status === "paid")
+  
+  // Combine paid billings and paid orders
+  const paidBillingsRaw = billings.filter((b: any) => b.status === "paid").map((b:any) => ({
+    ...b,
+    isOrder: false,
+    dateValue: new Date(b.tanggal_bayar || b.updated_at).getTime()
+  }));
+
+  const paidOrdersFormatted = paidOrders.map((o: any) => ({
+    ...o,
+    isOrder: true,
+    dateValue: new Date(o.tanggal_mulai || o.updated_at).getTime()
+  }));
+
+  const allPaidHistory = [...paidBillingsRaw, ...paidOrdersFormatted].sort((a, b) => b.dateValue - a.dateValue);
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -222,10 +248,49 @@ export function BillingPage() {
         <div className="xl:col-span-2 space-y-6">
           <h2 className="text-[15px] font-extrabold text-slate-800">Menunggu Pembayaran</h2>
           
-          {unpaidBillings.length > 0 ? (
+          {unpaidBillings.length > 0 || pendingOrders.length > 0 ? (
             <div className="space-y-4">
+              {/* Pending Orders (Instalasi) */}
+              {pendingOrders.map((order: any) => (
+                <div key={`order-${order.id}`} className="bg-white rounded-2xl p-6 shadow-sm border border-blue-200 border-l-4 border-l-blue-500 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                   <div className="flex gap-4">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border bg-blue-50 text-blue-600 border-blue-100">
+                         <AlertCircle className="w-6 h-6" />
+                      </div>
+                      <div>
+                         <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-extrabold text-slate-800 text-lg">ORD-{String(order.id).padStart(5, '0')}</h3>
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-blue-100 text-blue-700">
+                               Biaya Instalasi
+                            </span>
+                         </div>
+                         <p className="text-[13px] font-medium text-slate-500 mb-3">{order.paket?.nama || "Pemasangan Baru"}</p>
+                         
+                         <div className="flex items-center gap-2 text-[12px] font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Batas Bayar: <span className="text-slate-600">Segera</span>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="flex flex-col justify-between items-end gap-4 border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
+                      <div className="text-right">
+                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Total Biaya</p>
+                         <p className="text-2xl font-black text-slate-800 tracking-tight">{formatRupiah(order.total_harga)}</p>
+                      </div>
+                      <button
+                        onClick={() => handlePayment(order.id, true)}
+                        disabled={isPaying === -order.id || !isMidtransReady}
+                        className="w-full md:w-auto px-6 py-2.5 text-white text-[13px] font-bold rounded-xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2 bg-slate-900 hover:bg-slate-800">
+                        {!isMidtransReady ? "Memuat Gateway..." : isPaying === -order.id ? "Memproses..." : "Bayar Sekarang"} <ArrowRight className="w-4 h-4" />
+                      </button>
+                   </div>
+                </div>
+              ))}
+
+              {/* Tagihan Bulanan */}
               {unpaidBillings.map((billing: any) => (
-                <div key={billing.id} className={`bg-white rounded-2xl p-6 shadow-sm border ${billing.status === 'overdue' ? 'border-red-200 border-l-4 border-l-red-500' : 'border-slate-200 border-l-4 border-l-orange-500'} flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow`}>
+                <div key={`billing-${billing.id}`} className={`bg-white rounded-2xl p-6 shadow-sm border ${billing.status === 'overdue' ? 'border-red-200 border-l-4 border-l-red-500' : 'border-slate-200 border-l-4 border-l-orange-500'} flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow`}>
                    
                    {/* Info Tagihan */}
                    <div className="flex gap-4">
@@ -316,27 +381,37 @@ export function BillingPage() {
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {paidBillings.length > 0 ? (
-                paidBillings.map((billing: any) => (
-                  <tr key={billing.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+              {allPaidHistory.length > 0 ? (
+                allPaidHistory.map((item: any) => (
+                  <tr key={`${item.isOrder ? 'order' : 'billing'}-${item.id}`} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center border bg-emerald-50 text-emerald-600 border-emerald-100">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
-                        <span className="font-bold text-slate-800">INV-{String(billing.id).padStart(5, '0')}</span>
+                        <span className="font-bold text-slate-800">
+                          {item.isOrder ? `ORD-${String(item.id).padStart(5, '0')}` : `INV-${String(item.id).padStart(5, '0')}`}
+                        </span>
                       </div>
                     </td>
                     <td className="p-4">
-                      <p className="font-bold text-slate-700">{billing.order?.paket?.nama}</p>
-                      <p className="text-[11px] font-medium text-slate-400 mt-0.5">Langganan #{billing.order_id}</p>
+                      <p className="font-bold text-slate-700">
+                        {item.isOrder ? item.paket?.nama || "Instalasi Baru" : item.order?.paket?.nama || "Tagihan Bulanan"}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-400 mt-0.5">
+                        {item.isOrder ? "Biaya Pemasangan" : `Langganan #${item.order_id}`}
+                      </p>
                     </td>
                     <td className="p-4 text-slate-600 font-semibold">
-                      {billing.tanggal_bayar ? formatDate(billing.tanggal_bayar) : '-'}
+                      {item.isOrder 
+                        ? formatDate(item.tanggal_mulai || item.updated_at) 
+                        : (item.tanggal_bayar ? formatDate(item.tanggal_bayar) : '-')}
                     </td>
-                    <td className="p-4 font-black text-slate-800">{formatRupiah(billing.jumlah_tagihan)}</td>
+                    <td className="p-4 font-black text-slate-800">
+                      {formatRupiah(item.isOrder ? item.total_harga : item.jumlah_tagihan)}
+                    </td>
                     <td className="p-4 pr-6 text-right">
-                      <button onClick={() => handleDownloadInvoice(billing)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 inline-flex" title="Download Invoice PDF">
+                      <button onClick={() => handleDownloadInvoice(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 inline-flex" title="Download Invoice PDF">
                         <Download className="w-4 h-4" />
                       </button>
                     </td>

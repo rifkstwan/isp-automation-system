@@ -50,6 +50,7 @@ export default function OrderHistoryScreen() {
   const getStatusColor = (status: string) => {
     switch(status?.toLowerCase()) {
       case 'pending': return { bg: '#fef3c7', text: '#d97706' };
+      case 'dibayar': return { bg: '#dbeafe', text: '#2563eb' };
       case 'aktif': return { bg: '#ecfdf5', text: '#10b981' };
       case 'nonaktif': return { bg: '#f1f5f9', text: '#64748b' };
       case 'ditolak': return { bg: '#fee2e2', text: '#ef4444' };
@@ -245,7 +246,7 @@ export default function OrderHistoryScreen() {
               <Text style={styles.payBtnText}>Bayar Instalasi Pemasangan</Text>
             )}
           </TouchableOpacity>
-        ) : item.status?.toLowerCase() === 'aktif' || item.status?.toLowerCase() === 'selesai' ? (
+        ) : item.status?.toLowerCase() === 'dibayar' || item.status?.toLowerCase() === 'aktif' || item.status?.toLowerCase() === 'selesai' ? (
           <TouchableOpacity 
             style={styles.invoiceBtn}
             onPress={() => handleDownloadInvoice(item)}

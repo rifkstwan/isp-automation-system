@@ -18,11 +18,11 @@ class OrderController extends Controller
     // Customer: lihat order milik sendiri
     public function myOrders(Request $request)
     {
-        $orders = Order::with(['paket', 'upgradeRequests' => function ($query) {
+        $orders = Order::with(['paket', 'user', 'upgradeRequests' => function ($query) {
             $query->where('status', 'pending');
         }])
-            ->where('user_id', $request->user()->id)
-            ->orderByDesc('created_at')
+            ->where('user_id', auth()->id())
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json($orders);
@@ -127,7 +127,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status'          => 'required|in:pending,aktif,ditolak,selesai',
+            'status'          => 'required|in:pending,dibayar,aktif,ditolak,selesai,suspend',
             'tanggal_mulai'   => 'nullable|date',
             'tanggal_selesai' => 'nullable|date',
         ]);

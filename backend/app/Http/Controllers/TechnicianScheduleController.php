@@ -124,6 +124,37 @@ class TechnicianScheduleController extends Controller
             $schedule->ticket->update(['status' => 'selesai']);
         }
 
+        // Aktivasi Order jika jadwal ini adalah pemasangan baru
+        if ($request->status === 'selesai' && $schedule->order) {
+            $order = $schedule->order;
+            if (in_array($order->status, ['dibayar', 'pending'])) {
+                $order->status = 'aktif';
+                $order->tanggal_mulai = now();
+                $order->tanggal_selesai = now()->addDays($order->paket->durasi ?? 30);
+                
+                $mikrotikService = new \App\Services\MikrotikService();
+                $username = 'user_' . $order->user_id . '_' . rand(100, 999);
+                $password = \Illuminate\Support\Str::random(8);
+                $comment = 'Order ID: ' . $order->id . ' - ' . ($order->user->name ?? 'Unknown');
+                
+                if ($mikrotikService->addPppoeSecret($username, $password, 'default', $comment)) {
+                    $order->mikrotik_username = $username;
+                    $order->mikrotik_password = $password;
+                    if ($device = $mikrotikService->getDevice()) {
+                        $order->network_device_id = $device->id;
+                    }
+                }
+                $order->save();
+
+                try {
+                    $order->load(['user', 'paket']);
+                    \Illuminate\Support\Facades\Mail::to($order->user->email)->send(new \App\Mail\OrderActivatedMail($order));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Gagal kirim email aktivasi setelah pemasangan: ' . $e->getMessage());
+                }
+            }
+        }
+
         // AUTO-FIX DEMO: If marked as selesai, automatically change device IP from .99 to .1
         if ($request->status === 'selesai') {
             $user = \App\Models\User::find($schedule->user_id);

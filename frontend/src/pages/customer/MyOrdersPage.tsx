@@ -25,6 +25,7 @@ function formatDate(dateString: string) {
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; icon: any }> = {
   pending:  { label: "Menunggu Pembayaran", bg: "bg-orange-50", text: "text-orange-600", icon: AlertCircle },
+  dibayar:  { label: "Menunggu Pemasangan", bg: "bg-blue-50", text: "text-blue-600", icon: AlertCircle },
   aktif:    { label: "Layanan Aktif", bg: "bg-emerald-50", text: "text-emerald-600", icon: CheckCircle2 },
   ditolak:  { label: "Dibatalkan", bg: "bg-red-50", text: "text-red-600", icon: AlertCircle },
   selesai:  { label: "Selesai / Berakhir", bg: "bg-slate-100", text: "text-slate-600", icon: FileText },

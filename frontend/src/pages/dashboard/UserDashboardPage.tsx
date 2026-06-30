@@ -38,7 +38,7 @@ export function UserDashboardPage() {
   const completedTicketsCount = tickets?.filter(t => t.status === "selesai").length || 0
 
   // Get the most relevant order to display
-  const currentOrder = orders?.find(o => o.status === "aktif" || o.status === "suspend") || null
+  const currentOrder = orders?.find(o => o.status === "aktif" || o.status === "suspend" || o.status === "dibayar") || null
   const latestPendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null
 
   const { data: myTestimonial } = useMyTestimonial()
@@ -152,9 +152,11 @@ export function UserDashboardPage() {
                 </span>
                 <span className={`px-2.5 py-1 text-[11px] font-bold rounded-md ${
                     currentOrder?.status === 'aktif' ? 'bg-emerald-50 text-emerald-600' : 
+                    currentOrder?.status === 'dibayar' ? 'bg-blue-50 text-blue-600' : 
                     currentOrder?.status === 'suspend' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
                   }`}>
                   {currentOrder?.status === 'aktif' ? 'Aktif' : 
+                   currentOrder?.status === 'dibayar' ? 'Menunggu Pemasangan' : 
                    currentOrder?.status === 'suspend' ? 'Terisolir (Belum Bayar)' : 'Tidak Aktif'}
                 </span>
               </div>
@@ -252,6 +254,11 @@ export function UserDashboardPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   Online
                 </span>
+              ) : currentOrder?.status === 'dibayar' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  Menunggu Pemasangan
+                </span>
               ) : currentOrder?.status === 'suspend' ? (
                 <span className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full border border-red-100">
                   <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -265,32 +272,40 @@ export function UserDashboardPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">IP Address</p>
-                <p className="text-sm font-bold text-slate-700 font-mono">
-                  {currentOrder ? (currentOrder.ip_address || "10.10." + Math.floor(Math.random() * 255) + "." + Math.floor(Math.random() * 255)) : "-"}
-                </p>
+            {currentOrder?.status === 'aktif' || currentOrder?.status === 'suspend' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">IP Address</p>
+                  <p className="text-sm font-bold text-slate-700 font-mono">
+                    {currentOrder.ip_address || "10.10." + Math.floor(Math.random() * 255) + "." + Math.floor(Math.random() * 255)}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Uptime</p>
+                  <p className="text-sm font-bold text-slate-700">
+                    {currentOrder.status === 'aktif' ? "14d 3h 22m" : "-"}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kualitas Sinyal</p>
+                  <p className={`text-sm font-bold ${currentOrder.status === 'aktif' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {currentOrder.status === 'aktif' ? "-18 dBm (Sangat Baik)" : "-"}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipe Perangkat</p>
+                  <p className="text-sm font-bold text-slate-700">
+                    {currentOrder.tipe_perangkat || "FiberHome HG6243C"}
+                  </p>
+                </div>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Uptime</p>
-                <p className="text-sm font-bold text-slate-700">
-                  {currentOrder?.status === 'aktif' ? "14d 3h 22m" : "-"}
-                </p>
+            ) : (
+              <div className="bg-slate-50 rounded-xl p-8 border border-slate-100 flex flex-col items-center justify-center text-center">
+                <Wifi className="w-10 h-10 text-slate-300 mb-3" />
+                <p className="text-sm font-bold text-slate-600 mb-1">Perangkat Belum Terpasang</p>
+                <p className="text-xs text-slate-500 max-w-sm">Status Anda saat ini sedang dalam antrean jadwal pemasangan. Informasi perangkat akan muncul di sini setelah teknisi selesai memasang koneksi di lokasi Anda.</p>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kualitas Sinyal</p>
-                <p className={`text-sm font-bold ${currentOrder?.status === 'aktif' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {currentOrder?.status === 'aktif' ? "-18 dBm (Sangat Baik)" : "-"}
-                </p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipe Perangkat</p>
-                <p className="text-sm font-bold text-slate-700">
-                  {currentOrder?.tipe_perangkat || "FiberHome HG6243C"}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -335,6 +350,12 @@ export function UserDashboardPage() {
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-orange-50 text-orange-600 border border-orange-100/50">
                             <Clock className="w-3.5 h-3.5" />
                             Menunggu
+                          </span>
+                        )}
+                        {order.status === 'dibayar' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100/50">
+                            <Clock className="w-3.5 h-3.5" />
+                            Menunggu Pemasangan
                           </span>
                         )}
                         {(order.status === 'aktif' || order.status === 'selesai') && (
