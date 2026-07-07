@@ -10,10 +10,12 @@ services:
     image: postgres:16-alpine
     container_name: wifi_postgres
     restart: unless-stopped
+    env_file:
+      - .env.docker          # Secret: POSTGRES_PASSWORD
     environment:
       POSTGRES_DB: wifi_management_db
       POSTGRES_USER: wifi_user
-      POSTGRES_PASSWORD: password_strong
+      # POSTGRES_PASSWORD dibaca dari .env.docker
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -43,7 +45,7 @@ services:
       APP_NAME: "WiFi Management"
       APP_ENV: local
       APP_DEBUG: "true"
-      APP_KEY: base64:ptFO4Sjv3brbMTZ0unjJJT0KvC1unkdvYRg+GP39WZA=
+      # APP_KEY dibaca dari .env.docker
       APP_URL: http://localhost
       # Database - gunakan nama service 'postgres', bukan 127.0.0.1
       DB_CONNECTION: pgsql
@@ -91,9 +93,11 @@ services:
       - frontend_node_modules:/app/node_modules  # node_modules di container
     ports:
       - "5173:5173"   # Akses frontend: http://localhost:5173
+    env_file:
+      - .env.docker          # Secret: VITE_MIDTRANS_CLIENT_KEY
     environment:
       VITE_API_URL: http://localhost
-      VITE_MIDTRANS_CLIENT_KEY: Mid-client-egwQPdf0QmbYlfUJ
+      # VITE_MIDTRANS_CLIENT_KEY dibaca dari .env.docker
     networks:
       - wifi_network
 
