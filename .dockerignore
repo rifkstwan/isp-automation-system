@@ -1,0 +1,25 @@
+# ============================================================
+#  .dockerignore - File yang diabaikan saat Docker build
+# ============================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker files sendiri
+docker-compose*.yml
+.dockerignore
+
+# Editor & OS
+.vscode
+.idea
+.DS_Store
+*.log
+
+# Dokumentasi
+*.md
+docs/
+
+# Mobile app (tidak di-Docker)
+mobile/

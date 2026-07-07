@@ -1,0 +1,9 @@
+# Frontend .dockerignore
+node_modules
+.DS_Store
+.git
+.gitignore
+dist
+*.log
+README.md
+Dockerfile

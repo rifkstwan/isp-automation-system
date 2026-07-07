@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies dulu (layer cache)
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Start Vite dev server dengan host 0.0.0.0 agar bisa diakses dari luar container
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

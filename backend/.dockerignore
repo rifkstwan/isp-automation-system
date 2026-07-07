@@ -1,0 +1,21 @@
+# Backend .dockerignore
+node_modules
+vendor
+.env
+.env.backup
+.env.production
+storage/logs/*.log
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+.git
+.gitignore
+.DS_Store
+*.log
+Dockerfile
+README.md
+test_api*.php
+test_tinker.php
+process_map.php
+real_data.json
+WiFi_Management_API.postman_collection.json
