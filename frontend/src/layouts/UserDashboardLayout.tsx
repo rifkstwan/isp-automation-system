@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useRef } from "react"
+import { type ReactNode, useState, useEffect, useRef } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { useMyOrders } from "../hooks/useOrders"
@@ -15,7 +15,6 @@ import {
   User,
   Settings,
   LogOut,
-  Bot,
   ChevronDown,
   MoreHorizontal
 } from "lucide-react"
@@ -25,7 +24,7 @@ type UserDashboardLayoutProps = {
 }
 
 export function UserDashboardLayout({ children }: UserDashboardLayoutProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, roles } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -77,7 +76,8 @@ export function UserDashboardLayout({ children }: UserDashboardLayoutProps) {
 
   // Hitung status layanan aktif
   let statusText = "Nonaktif"
-  let statusColor = "text-slate-500"
+  let statusColor = "text-slate-700"
+  let textMutedColor = "text-slate-500"
   let bgColor = "bg-slate-50"
   let borderColor = "border-slate-200"
 
@@ -86,14 +86,28 @@ export function UserDashboardLayout({ children }: UserDashboardLayoutProps) {
   } else if (orders) {
     if (orders.some(o => o.status === "aktif")) {
       statusText = "Aktif"
-      statusColor = "text-teal-600"
-      bgColor = "bg-[#f0fdfa]/60"
-      borderColor = "border-teal-50/50"
+      statusColor = "text-emerald-800"
+      textMutedColor = "text-emerald-700"
+      bgColor = "bg-emerald-50/50"
+      borderColor = "border-emerald-100"
+    } else if (orders.some(o => o.status === "dibayar")) {
+      statusText = "Menunggu Pemasangan"
+      statusColor = "text-blue-800"
+      textMutedColor = "text-blue-700"
+      bgColor = "bg-blue-50/50"
+      borderColor = "border-blue-100"
     } else if (orders.some(o => o.status === "pending")) {
-      statusText = "Pending"
-      statusColor = "text-yellow-600"
-      bgColor = "bg-yellow-50/60"
-      borderColor = "border-yellow-100/50"
+      statusText = "Menunggu Pembayaran"
+      statusColor = "text-amber-800"
+      textMutedColor = "text-amber-700"
+      bgColor = "bg-amber-50/50"
+      borderColor = "border-amber-100"
+    } else if (orders.some(o => o.status === "suspend")) {
+      statusText = "Terisolir"
+      statusColor = "text-red-800"
+      textMutedColor = "text-red-700"
+      bgColor = "bg-red-50/50"
+      borderColor = "border-red-100"
     }
   }
 
@@ -125,7 +139,7 @@ export function UserDashboardLayout({ children }: UserDashboardLayoutProps) {
             </div>
             <div className="overflow-hidden">
               <h3 className="font-bold text-slate-800 text-[14px] truncate">{user?.name || "Iquash"}</h3>
-              <p className="text-[12px] font-medium text-slate-500 mt-0.5 truncate">{user?.roles?.[0] === 'admin' ? 'Administrator' : 'Pelanggan WiFi'}</p>
+              <p className="text-[12px] font-medium text-slate-500 mt-0.5 truncate">{roles?.[0] === 'admin' ? 'Administrator' : 'Pelanggan WiFi'}</p>
             </div>
           </div>
           <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -133,18 +147,12 @@ export function UserDashboardLayout({ children }: UserDashboardLayoutProps) {
 
         {/* Balance / Status Card */}
         <div className="px-5 pb-5">
-          <div className={`rounded-xl p-4 border shadow-sm relative overflow-hidden transition-colors ${statusText === 'Aktif' ? 'bg-emerald-50/50 border-emerald-100' :
-              statusText === 'Pending' ? 'bg-amber-50/50 border-amber-100' : 'bg-slate-50 border-slate-200'
-            }`}>
+          <div className={`rounded-xl p-4 border shadow-sm relative overflow-hidden transition-colors ${bgColor} ${borderColor}`}>
             <div className="flex justify-between items-center mb-1">
-              <p className={`text-[11px] font-medium tracking-wide ${statusText === 'Aktif' ? 'text-emerald-700' :
-                  statusText === 'Pending' ? 'text-amber-700' : 'text-slate-500'
-                }`}>Status Layanan</p>
+              <p className={`text-[11px] font-medium tracking-wide ${textMutedColor}`}>Status Layanan</p>
               <MoreHorizontal className="w-4 h-4 text-slate-400 cursor-pointer hover:text-slate-600" />
             </div>
-            <h4 className={`text-[20px] font-bold tracking-tight ${statusText === 'Aktif' ? 'text-emerald-800' :
-                statusText === 'Pending' ? 'text-amber-800' : 'text-slate-700'
-              }`}>{statusText}</h4>
+            <h4 className={`text-[15px] font-bold tracking-tight ${statusColor}`}>{statusText}</h4>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useAuth } from "../../contexts/AuthContext"
@@ -16,10 +16,36 @@ export function ProfilePage() {
   const [address, setAddress] = useState(user?.address || "")
   const [avatar, setAvatar] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_url || null)
-  
-  // Notification preferences
   const [emailNotif, setEmailNotif] = useState(user?.email_notif ?? true)
   const [waNotif, setWaNotif] = useState(user?.wa_notif ?? true)
+
+
+  // Keep state synced with auth user
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "")
+      setEmail(user.email || "")
+      setPhone(user.phone || "")
+      setAddress(user.address || "")
+      setAvatarPreview(user.avatar_url || null)
+      setEmailNotif(user.email_notif ?? true)
+      setWaNotif(user.wa_notif ?? true)
+
+      // Fallback: If user.address is blank, fetch latest order address
+      if (!user.address) {
+        api.get('/orders/my').then((res) => {
+          if (res.data && res.data.length > 0) {
+            const latestOrder = res.data[0]
+            const cleanAlamat = (latestOrder.alamat || '').replace(/(?:Link|Titik)\s*Maps:[\s\S]*/i, '').trim()
+            if (cleanAlamat) {
+              setAddress(cleanAlamat)
+            }
+          }
+        }).catch(() => {})
+      }
+    }
+  }, [user])
+
 
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
 

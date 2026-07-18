@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useMyOrders } from "../../hooks/useOrders"
 import { useSchedules } from "../../hooks/useSchedules"
-import { Globe, MapPin, CheckCircle2, AlertCircle, Cpu, Zap, Wifi, Activity, ArrowRight, ShieldCheck, Server, X } from "lucide-react"
+import { Globe, MapPin, CheckCircle2, AlertCircle, Cpu, Zap, Activity, ArrowRight, ShieldCheck, Server, X } from "lucide-react"
 import { OrderPage } from "../customer/OrderPage"
 import api from "../../services/api"
 
 export function ServicesPage() {
-  const { data: orders, mutate } = useMyOrders()
+  const { data: orders, refetch } = useMyOrders()
   const { data: schedules } = useSchedules()
   
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
@@ -17,8 +17,10 @@ export function ServicesPage() {
   
   // Find the active order
   const activeOrder = orders?.find((o) => o.status === "aktif")
+  const paidOrder = orders?.find((o) => o.status === "dibayar")
   const pendingOrder = orders?.find((o) => o.status === "pending")
-  const currentService = activeOrder || pendingOrder
+  const suspendOrder = orders?.find((o) => o.status === "suspend")
+  const currentService = activeOrder || paidOrder || pendingOrder || suspendOrder
 
   // Check if there's a pending upgrade request for this order
   const pendingUpgrade = currentService?.upgrade_requests && currentService.upgrade_requests.length > 0 
@@ -60,7 +62,7 @@ export function ServicesPage() {
       })
       alert("Permintaan upgrade berhasil dikirim. Menunggu persetujuan admin.")
       setShowUpgradeModal(false)
-      mutate() // Refresh order data
+      refetch() // Refresh order data
     } catch (err: any) {
       console.error(err)
       alert(err.response?.data?.message || "Gagal mengirim permintaan.")
@@ -81,7 +83,42 @@ export function ServicesPage() {
     return <OrderPage />
   }
 
-  const isActive = currentService.status === 'aktif'
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'aktif':
+        return {
+          label: 'Aktif & Terkoneksi',
+          className: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+          icon: <CheckCircle2 className="w-3.5 h-3.5" />
+        }
+      case 'dibayar':
+        return {
+          label: 'Menunggu Pemasangan',
+          className: 'bg-blue-50 text-blue-600 border-blue-100',
+          icon: <AlertCircle className="w-3.5 h-3.5" />
+        }
+      case 'pending':
+        return {
+          label: 'Menunggu Pembayaran',
+          className: 'bg-amber-50 text-amber-600 border-amber-100',
+          icon: <AlertCircle className="w-3.5 h-3.5" />
+        }
+      case 'suspend':
+        return {
+          label: 'Layanan Diisolir',
+          className: 'bg-red-50 text-red-600 border-red-100',
+          icon: <AlertCircle className="w-3.5 h-3.5" />
+        }
+      default:
+        return {
+          label: status.toUpperCase(),
+          className: 'bg-slate-50 text-slate-600 border-slate-100',
+          icon: <AlertCircle className="w-3.5 h-3.5" />
+        }
+    }
+  }
+
+  const badge = getStatusBadge(currentService.status)
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -101,9 +138,9 @@ export function ServicesPage() {
          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div>
                <div className="flex items-center gap-3 mb-4">
-                  <span className={`px-2.5 py-1 text-[11px] font-extrabold tracking-wider uppercase rounded-md border flex items-center gap-1.5 ${isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                    {isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                    {isActive ? 'Aktif & Terkoneksi' : 'Menunggu Pemasangan'}
+                  <span className={`px-2.5 py-1 text-[11px] font-extrabold tracking-wider uppercase rounded-md border flex items-center gap-1.5 ${badge.className}`}>
+                    {badge.icon}
+                    {badge.label}
                   </span>
                   <span className="px-2.5 py-1 text-[11px] font-extrabold tracking-wider uppercase rounded-md bg-slate-50 border border-slate-200 text-slate-500">
                     ID: #SRV-{String(currentService.id).padStart(4, '0')}
@@ -174,7 +211,7 @@ export function ServicesPage() {
              <div className="flex flex-col gap-2 pb-4 border-b border-slate-50">
                 <span className="text-[13px] font-bold text-slate-500">Alamat Pemasangan</span>
                 <span className="text-[14px] font-extrabold text-slate-800 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  {currentService.alamat}
+                  {currentService.alamat?.replace(/(?:Link|Titik)\s*Maps:[\s\S]*/i, '').trim()}
                 </span>
              </div>
              <div className="flex justify-between items-center">
@@ -198,15 +235,27 @@ export function ServicesPage() {
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
          <h3 className="text-[15px] font-extrabold text-slate-800 mb-5">Aksi Layanan</h3>
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link to="/dashboard/tickets" className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all group">
-               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Activity className="w-5 h-5" />
+             {currentService.status === 'aktif' ? (
+               <Link to="/dashboard/tickets" className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all group">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                     <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                     <h4 className="text-[14px] font-bold text-slate-800">Lapor Gangguan</h4>
+                     <p className="text-[12px] font-medium text-slate-500 mt-0.5">Internet lambat atau mati? Buat tiket laporan ke teknisi.</p>
+                  </div>
+               </Link>
+             ) : (
+               <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed">
+                  <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+                     <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                     <h4 className="text-[14px] font-bold text-slate-800">Lapor Gangguan</h4>
+                     <p className="text-[12px] font-medium text-slate-500 mt-0.5">Tersedia setelah layanan terpasang & aktif oleh teknisi.</p>
+                  </div>
                </div>
-               <div>
-                  <h4 className="text-[14px] font-bold text-slate-800">Lapor Gangguan</h4>
-                  <p className="text-[12px] font-medium text-slate-500 mt-0.5">Internet lambat atau mati? Buat tiket laporan ke teknisi.</p>
-               </div>
-            </Link>
+             )}
             
             <button 
                onClick={handleOpenUpgrade} 
@@ -225,7 +274,7 @@ export function ServicesPage() {
                   </h4>
                   <p className="text-[12px] font-medium text-slate-500 mt-0.5">
                     {currentService.status !== 'aktif' 
-                      ? 'Layanan belum aktif' 
+                      ? 'Tersedia setelah layanan terpasang & aktif oleh teknisi.' 
                       : pendingUpgrade 
                         ? 'Menunggu persetujuan dari tim Admin.'
                         : 'Butuh kecepatan lebih? Ganti paket internet Anda.'}

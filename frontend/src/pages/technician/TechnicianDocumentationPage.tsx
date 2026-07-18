@@ -1,20 +1,67 @@
 import { useQuery } from "@tanstack/react-query"
-import { Camera, Image as ImageIcon, Calendar, CheckCircle2 } from "lucide-react"
+import { Camera, Image as ImageIcon, Calendar, CheckCircle2, Package } from "lucide-react"
 import api from "../../services/api"
 
 export function TechnicianDocumentationPage() {
-  // Mengambil data tiket, karena di sistem ini foto bukti kerja tersimpan di tiket gangguan
-  const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["technician-documentation"],
+  const getStorageUrl = (path: string) => {
+    const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost';
+    return `${baseUrl}/storage/${path}`;
+  }
+
+  // Mengambil data tiket gangguan
+  const { data: tickets = [], isLoading: isLoadingTickets } = useQuery({
+    queryKey: ["technician-documentation-tickets"],
     queryFn: async () => {
       const res = await api.get("/technician/tickets")
-      return res.data
+      return res.data || []
     },
-    refetchInterval: 5000,
+    staleTime: 10000,
+    gcTime: 300000,
+    refetchInterval: 10000,
   })
 
-  // Filter hanya tiket yang sudah ada fotonya
-  const documentedTickets = tickets.filter((ticket: any) => ticket.foto)
+  // Mengambil data jadwal pemasangan baru
+  const { data: schedules = [], isLoading: isLoadingSchedules } = useQuery({
+    queryKey: ["technician-documentation-schedules"],
+    queryFn: async () => {
+      const res = await api.get("/schedules/my")
+      return res.data || []
+    },
+    staleTime: 10000,
+    gcTime: 300000,
+    refetchInterval: 10000,
+  })
+
+  const isLoading = isLoadingTickets || isLoadingSchedules
+
+  // Filter tiket & jadwal yang memiliki foto
+  const ticketDocs = tickets
+    .filter((t: any) => t.foto)
+    .map((t: any) => ({
+      id: `TKT-${t.id}`,
+      judul: t.judul,
+      user_name: t.user?.name || "Pelanggan",
+      foto: t.foto,
+      type: "Perbaikan (Tiket)",
+      status: t.status,
+      updated_at: t.updated_at
+    }))
+
+  const scheduleDocs = schedules
+    .filter((s: any) => s.foto || s.order?.foto)
+    .map((s: any) => ({
+      id: `INS-${s.id}`,
+      judul: `Instalasi: ${s.order?.paket?.nama || 'WiFi Baru'}`,
+      user_name: s.order?.user?.name || s.user?.name || "Pelanggan",
+      foto: s.foto || s.order?.foto,
+      type: "Pemasangan Baru",
+      status: s.status,
+      updated_at: s.updated_at
+    }))
+
+  const allDocs = [...ticketDocs, ...scheduleDocs].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -28,23 +75,23 @@ export function TechnicianDocumentationPage() {
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Menarik data dokumentasi...</div>
-      ) : documentedTickets.length === 0 ? (
+      ) : allDocs.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-slate-100">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
             <ImageIcon className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-700">Belum Ada Dokumentasi</h3>
-          <p className="text-slate-500 text-sm mt-1">Anda belum mengunggah foto bukti pengerjaan apapun. Selesaikan tiket dan unggah foto untuk melihatnya di sini.</p>
+          <p className="text-slate-500 text-sm mt-1">Anda belum mengunggah foto bukti pengerjaan apapun. Selesaikan tiket atau pemasangan dan unggah foto untuk melihatnya di sini.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {documentedTickets.map((ticket: any) => (
-            <div key={ticket.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden group">
+          {allDocs.map((doc: any) => (
+            <div key={doc.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden group">
               
               {/* Photo Area */}
               <div className="aspect-square bg-slate-100 relative overflow-hidden">
                 <img 
-                  src={`http://localhost:8000/storage/${ticket.foto}`} 
+                  src={getStorageUrl(doc.foto)} 
                   alt="Bukti Kerja" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   onError={(e) => {
@@ -56,10 +103,10 @@ export function TechnicianDocumentationPage() {
                   }}
                 />
                 <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5">
-                   <Camera className="w-3 h-3" />
-                   TKT-{ticket.id}
+                   {doc.type === "Pemasangan Baru" ? <Package className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
+                   {doc.id}
                 </div>
-                {ticket.status === 'selesai' && (
+                {doc.status === 'selesai' && (
                   <div className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
                      <CheckCircle2 className="w-3 h-3" />
                      Selesai
@@ -69,20 +116,24 @@ export function TechnicianDocumentationPage() {
 
               {/* Details Area */}
               <div className="p-4">
-                <p className="font-bold text-slate-800 text-sm mb-1 truncate" title={ticket.judul}>{ticket.judul}</p>
+                <p className="font-bold text-slate-800 text-sm mb-1 truncate" title={doc.judul}>{doc.judul}</p>
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[9px] text-slate-600">
-                     {ticket.user.name.charAt(0)}
+                     {doc.user_name.charAt(0)}
                    </div>
-                   <span className="truncate">{ticket.user.name}</span>
+                   <span className="truncate">{doc.user_name}</span>
                 </div>
                 
-                <div className="pt-3 border-t border-slate-100 flex items-center text-[11px] text-slate-400 font-medium">
-                   <Calendar className="w-3 h-3 mr-1.5" />
-                   {new Date(ticket.updated_at).toLocaleDateString('id-ID', { 
-                     day: 'numeric', month: 'long', year: 'numeric',
-                     hour: '2-digit', minute: '2-digit'
-                   })}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                   <span className="flex items-center">
+                     <Calendar className="w-3 h-3 mr-1.5" />
+                     {new Date(doc.updated_at).toLocaleDateString('id-ID', { 
+                       day: 'numeric', month: 'short', year: 'numeric'
+                     })}
+                   </span>
+                   <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                     {doc.type}
+                   </span>
                 </div>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useRef } from "react"
+import { type ReactNode, useState, useEffect } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { useNotifications } from "../hooks/useNotifications"
@@ -31,7 +31,8 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
   const location = useLocation()
   
   const { data: notifications } = useNotifications()
-  const unreadCount = notifications?.filter(n => !n.is_read).length || 0
+  const unreadTicketsCount = notifications?.filter(n => !n.is_read && (n as any).type === 'ticket_update').length || 0
+  const unreadSchedulesCount = notifications?.filter(n => !n.is_read && ((n as any).type === 'order_update' || (n as any).type === 'schedule')).length || 0
 
   const { data: settings } = useSettings()
   const companyName = settings?.company_name || "CV. Citra Mandiri"
@@ -63,8 +64,12 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
     { name: "Profil", path: "/technician/profile", icon: User },
   ]
 
-  const isAdmin = user?.role === 'admin' || (user as any)?.roles?.includes('admin') || true // We know they are admin if they are here and want to go back, but let's check properly:
-  const isActuallyAdmin = user?.roles?.includes('admin') || user?.role === 'admin'
+  const isActuallyAdmin = (user as any)?.roles?.includes('admin') || (user as any)?.role === 'admin'
+
+  const currentMenuItem = [...menuItems, ...settingsMenu].find(item => 
+    location.pathname === item.path || (item.path !== '/technician' && location.pathname.startsWith(item.path))
+  )
+  const pageTitle = currentMenuItem ? currentMenuItem.name : "Dashboard Teknisi"
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -130,9 +135,14 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
                   <item.icon className={`w-[18px] h-[18px] ${active ? 'text-white' : 'text-slate-400'}`} strokeWidth={active ? 2.5 : 2} />
                   {item.name}
                 </div>
-                {item.name === "Tiket Gangguan" && unreadCount > 0 && (
+                {item.name === "Tiket Gangguan" && unreadTicketsCount > 0 && (
                   <span className="bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm">
-                    {unreadCount}
+                    {unreadTicketsCount}
+                  </span>
+                )}
+                {(item.name === "Jadwal Saya" || item.name === "Instalasi Baru") && unreadSchedulesCount > 0 && (
+                  <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm">
+                    {unreadSchedulesCount}
                   </span>
                 )}
               </Link>
@@ -180,7 +190,7 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
         <div className="p-4 border-t border-slate-100">
            <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between group">
               <div className="flex items-center gap-3">
-                <img src={user?.avatar_url || `https://ui-avatars.com/api/?name=${user?.name || "Teknisi"}&background=f1f5f9&color=0f172a&bold=true`} alt="Avatar" className="w-10 h-10 rounded-full bg-white object-cover shadow-sm" />
+                <img src={(user as any)?.avatar_url || `https://ui-avatars.com/api/?name=${user?.name || "Teknisi"}&background=f1f5f9&color=0f172a&bold=true`} alt="Avatar" className="w-10 h-10 rounded-full bg-white object-cover shadow-sm" />
                 <div className="overflow-hidden">
                   <h3 className="font-semibold text-slate-900 text-sm truncate">{user?.name || "Teknisi"}</h3>
                   <p className="text-xs text-slate-500 truncate">Teknisi Lapangan</p>
@@ -201,7 +211,7 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
               <button className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(true)}>
                  <Menu className="w-5 h-5" />
               </button>
-              <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight hidden sm:block">Dashboard Teknisi</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight hidden sm:block">{pageTitle}</h1>
            </div>
 
            <div className="flex items-center gap-3 md:gap-5">
@@ -212,7 +222,7 @@ export function TechnicianDashboardLayout({ children }: TechnicianDashboardLayou
                     <p className="text-[14px] font-semibold text-slate-800 leading-tight">{user?.name || "Teknisi"}</p>
                     <p className="text-[11px] font-medium text-slate-500">Teknisi Lapangan</p>
                  </div>
-                 <img src={user?.avatar_url || `https://ui-avatars.com/api/?name=${user?.name || "Teknisi"}&background=f1f5f9&color=0f172a&bold=true`} alt="Avatar" className="w-10 h-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100 object-cover" />
+                 <img src={(user as any)?.avatar_url || `https://ui-avatars.com/api/?name=${user?.name || "Teknisi"}&background=f1f5f9&color=0f172a&bold=true`} alt="Avatar" className="w-10 h-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100 object-cover" />
               </div>
            </div>
         </header>

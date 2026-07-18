@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Search, Receipt, Plus, X, CheckCircle2, AlertCircle, Clock, CheckCircle } from "lucide-react"
+import { Search, Receipt, Plus, X, CheckCircle2, AlertCircle, Clock, CheckCircle, Phone } from "lucide-react"
 import api from "../../services/api"
+import { WhatsAppTemplateModal, type RecipientInfo } from "../../components/WhatsAppTemplateModal"
 
 function formatRupiah(angka: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -29,6 +30,7 @@ type Billing = {
   user: {
     name: string
     email: string
+    phone?: string
   }
   order: {
     paket: {
@@ -40,7 +42,9 @@ type Billing = {
 export function AdminBillingPage() {
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("semua")
+  const [statusFilter, setStatusFilter] = useState("semua")
+  const [waModalOpen, setWaModalOpen] = useState(false)
+  const [waRecipient, setWaRecipient] = useState<RecipientInfo>({})
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Form for manual billing creation
@@ -228,14 +232,32 @@ export function AdminBillingPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {billing.status !== "paid" && (
-                          <button 
-                            onClick={() => handleMarkAsPaid(billing.id)}
-                            disabled={markAsPaid.isPending}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold border border-emerald-200 transition-colors disabled:opacity-50"
-                            title="Tandai Sudah Dibayar"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" /> Tandai Lunas
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                setWaRecipient({
+                                  name: billing.user.name,
+                                  phone: billing.user.phone || "",
+                                  packageName: billing.order?.paket?.nama || "",
+                                  notes: `Jumlah: ${formatRupiah(billing.jumlah_tagihan)}, Tenggat: ${new Date(billing.jatuh_tempo).toLocaleDateString('id-ID')}`,
+                                  type: "billing"
+                                })
+                                setWaModalOpen(true)
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-xs font-bold border border-slate-200 transition-colors"
+                              title="Ingatkan Tagihan via WhatsApp"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-emerald-600" /> Remind WA
+                            </button>
+                            <button 
+                              onClick={() => handleMarkAsPaid(billing.id)}
+                              disabled={markAsPaid.isPending}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold border border-emerald-200 transition-colors disabled:opacity-50"
+                              title="Tandai Sudah Dibayar"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Tandai Lunas
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -340,6 +362,13 @@ export function AdminBillingPage() {
           </div>
         </div>
       )}
+      {/* WhatsApp Template Modal */}
+      <WhatsAppTemplateModal
+        isOpen={waModalOpen}
+        onClose={() => setWaModalOpen(false)}
+        role="admin"
+        recipient={waRecipient}
+      />
     </div>
   )
 }

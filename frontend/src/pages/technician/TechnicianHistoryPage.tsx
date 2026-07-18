@@ -1,86 +1,99 @@
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { History, CheckCircle2, Wrench, Package, Calendar } from "lucide-react"
+import { History, Wrench, Package, Calendar } from "lucide-react"
 import api from "../../services/api"
 
 export function TechnicianHistoryPage() {
-  // Mengambil data tiket gangguan
-  const { data: tickets = [], isLoading: loadingTickets } = useQuery({
-    queryKey: ["technician-tickets"],
+  const [activeFilter, setActiveFilter] = useState<'semua' | 'instalasi' | 'gangguan'>('semua')
+
+  const { data: rawHistory = [], isLoading } = useQuery<any[]>({
+    queryKey: ["technician-history"],
     queryFn: async () => {
-      const res = await api.get("/technician/tickets")
+      const res = await api.get("/technician/history")
       return res.data
     },
     refetchInterval: 5000,
   })
 
-  // Mengambil data instalasi (orders)
-  const { data: installations = [], isLoading: loadingInstallations } = useQuery({
-    queryKey: ["technician-installations"],
-    queryFn: async () => {
-      const res = await api.get("/technician/installations")
-      return res.data
-    },
-    refetchInterval: 5000,
+  const historyItems = rawHistory.map((item: any) => ({
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    customer: item.customer || 'Pelanggan',
+    category: item.category,
+    date: new Date(item.updated_at),
+    icon: item.category === 'instalasi' ? Package : Wrench,
+    colorClass: item.category === 'instalasi' ? 'text-blue-500 bg-blue-50' : 'text-amber-500 bg-amber-50',
+    badgeClass: item.category === 'instalasi' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+  }))
+
+  const filteredItems = historyItems.filter((item) => {
+    if (activeFilter === 'instalasi') return item.category === 'instalasi'
+    if (activeFilter === 'gangguan') return item.category === 'gangguan'
+    return true
   })
 
-  const isLoading = loadingTickets || loadingInstallations
-
-  // Menggabungkan tiket dan instalasi yang sudah selesai
-  const historyItems = [
-    ...tickets
-      .filter((t: any) => t.status === 'selesai')
-      .map((t: any) => ({
-        id: `TKT-${t.id}`,
-        type: 'Perbaikan Gangguan',
-        title: t.judul,
-        customer: t.user?.name || 'Unknown',
-        date: new Date(t.updated_at),
-        icon: Wrench,
-        colorClass: 'text-amber-500 bg-amber-50',
-        badgeClass: 'bg-amber-100 text-amber-700'
-      })),
-    ...installations
-      .filter((i: any) => i.status === 'selesai')
-      .map((i: any) => ({
-        id: `ORD-${i.id}`,
-        type: 'Instalasi Baru',
-        title: `Paket ${i.paket?.nama_paket || 'Internet'}`,
-        customer: i.user?.name || 'Unknown',
-        date: new Date(i.updated_at),
-        icon: Package,
-        colorClass: 'text-blue-500 bg-blue-50',
-        badgeClass: 'bg-blue-100 text-blue-700'
-      }))
-  ].sort((a, b) => b.date.getTime() - a.date.getTime())
+  const countInstalasi = historyItems.filter(i => i.category === 'instalasi').length
+  const countGangguan = historyItems.filter(i => i.category === 'gangguan').length
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Riwayat Pekerjaan</h1>
           <p className="text-sm text-slate-500 mt-1">Rekam jejak seluruh instalasi dan perbaikan yang telah Anda selesaikan.</p>
         </div>
-        <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 self-start sm:self-auto">
-           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-           {historyItems.length} Pekerjaan Selesai
+
+        {/* Tab Filters */}
+        <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl self-start sm:self-auto text-xs font-bold">
+          <button
+            onClick={() => setActiveFilter('semua')}
+            className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeFilter === 'semua' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Semua ({historyItems.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('instalasi')}
+            className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeFilter === 'instalasi' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            Instalasi Baru ({countInstalasi})
+          </button>
+          <button
+            onClick={() => setActiveFilter('gangguan')}
+            className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeFilter === 'gangguan' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            Tiket Gangguan ({countGangguan})
+          </button>
         </div>
       </div>
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Menarik data riwayat...</div>
-      ) : historyItems.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-slate-100">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
             <History className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-700">Belum Ada Riwayat</h3>
-          <p className="text-slate-500 text-sm mt-1">Anda belum menyelesaikan tugas instalasi atau perbaikan apapun.</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {activeFilter === 'semua' ? 'Anda belum menyelesaikan tugas instalasi atau perbaikan apapun.' :
+             activeFilter === 'instalasi' ? 'Belum ada riwayat instalasi baru yang selesai.' :
+             'Belum ada riwayat tiket gangguan yang selesai.'}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="divide-y divide-slate-100">
-            {historyItems.map((item, index) => (
+            {filteredItems.map((item, index) => (
               <div key={index} className="p-5 sm:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 
                 {/* Icon Box */}

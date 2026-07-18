@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Ticket;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\TicketCreatedMail;
+use App\Mail\TicketUpdatedMail;
 use App\Services\WhatsAppService;
 
 class TicketController extends Controller
@@ -47,6 +50,14 @@ class TicketController extends Controller
             'ticket'
         );
 
+        $ticket->load('user');
+
+        try {
+            Mail::to($ticket->user->email)->send(new TicketCreatedMail($ticket));
+        } catch (\Exception $e) {
+            \Log::error('Gagal kirim email ticket created: ' . $e->getMessage());
+        }
+
         return response()->json($ticket, 201);
     }
 
@@ -83,6 +94,51 @@ class TicketController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
             
+        foreach ($tickets as $ticket) {
+            if ($ticket->user && empty($ticket->user->address)) {
+                $latestOrder = \App\Models\Order::where('user_id', $ticket->user_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+                if ($latestOrder) {
+                    $ticket->user->address = ($latestOrder->catatan ? $latestOrder->catatan . ', ' : '') . $latestOrder->alamat;
+                }
+            }
+        }
+            
+        return response()->json($tickets);
+    }
+
+    public function myTechnicianTickets(Request $request)
+    {
+        $technicianName = $request->user()->name;
+
+        // Ambil ID tiket yang ditugaskan khusus ke teknisi LAIN
+        $assignedOtherTickets = \App\Models\TechnicianSchedule::whereNotNull('ticket_id')
+            ->where('nama_teknisi', '!=', $technicianName)
+            ->pluck('ticket_id');
+
+        $tickets = Ticket::with('user')
+            ->whereNotIn('id', $assignedOtherTickets)
+            ->orderByRaw("CASE 
+                WHEN status = 'menunggu' THEN 1
+                WHEN status = 'diproses' THEN 2
+                WHEN status = 'selesai' THEN 3
+                ELSE 4
+            END")
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        foreach ($tickets as $ticket) {
+            if ($ticket->user && empty($ticket->user->address)) {
+                $latestOrder = \App\Models\Order::where('user_id', $ticket->user_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+                if ($latestOrder) {
+                    $ticket->user->address = ($latestOrder->catatan ? $latestOrder->catatan . ', ' : '') . $latestOrder->alamat;
+                }
+            }
+        }
+            
         return response()->json($tickets);
     }
 
@@ -95,6 +151,18 @@ class TicketController extends Controller
         $ticket = Ticket::findOrFail($id);
         $ticket->status = $request->status;
         $ticket->save();
+
+        // Sync with technician schedule
+        $schedule = \App\Models\TechnicianSchedule::where('ticket_id', $id)->first();
+        if ($schedule) {
+            if ($request->status === 'diproses') {
+                $schedule->update(['status' => 'pengerjaan']);
+            } elseif ($request->status === 'selesai') {
+                $schedule->update(['status' => 'selesai']);
+            } elseif ($request->status === 'menunggu') {
+                $schedule->update(['status' => 'menunggu']);
+            }
+        }
 
         $ticket->load('user');
 
@@ -124,6 +192,12 @@ class TicketController extends Controller
             \Log::error('Gagal kirim WA ticket update: ' . $e->getMessage());
         }
 
+        try {
+            Mail::to($ticket->user->email)->send(new TicketUpdatedMail($ticket));
+        } catch (\Exception $e) {
+            \Log::error('Gagal kirim email ticket update: ' . $e->getMessage());
+        }
+
         return response()->json(['message' => 'Status tiket berhasil diubah', 'ticket' => $ticket]);
     }
 
@@ -146,6 +220,12 @@ class TicketController extends Controller
         $ticket->status = $request->status;
         $ticket->save();
 
+        // Sync with technician schedule
+        $schedule = \App\Models\TechnicianSchedule::where('ticket_id', $id)->first();
+        if ($schedule && $request->status === 'selesai') {
+            $schedule->update(['status' => 'selesai']);
+        }
+
         $ticket->load('user');
 
         // AUTO-FIX DEMO: If marked as selesai, automatically change device IP from .99 to .1
@@ -165,6 +245,12 @@ class TicketController extends Controller
             WhatsAppService::sendTicketUpdateNotification($ticket->user, $ticket);
         } catch (\Exception $e) {
             \Log::error('Gagal kirim WA ticket photo update: ' . $e->getMessage());
+        }
+
+        try {
+            Mail::to($ticket->user->email)->send(new TicketUpdatedMail($ticket));
+        } catch (\Exception $e) {
+            \Log::error('Gagal kirim email ticket photo update: ' . $e->getMessage());
         }
 
         return response()->json(['message' => 'Bukti foto berhasil diunggah', 'ticket' => $ticket]);

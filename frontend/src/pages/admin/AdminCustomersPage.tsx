@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Search, Plus, Trash2, Edit, ShieldAlert, CheckCircle, Package, X, Printer } from "lucide-react"
+import { Search, Plus, Trash2, Edit, ShieldAlert, CheckCircle, Package, X, Printer, Phone } from "lucide-react"
 import api from "../../services/api"
+import { WhatsAppTemplateModal, type RecipientInfo } from "../../components/WhatsAppTemplateModal"
 
 type Customer = {
   id: number
@@ -24,6 +25,8 @@ export function AdminCustomersPage() {
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("semua")
+  const [waModalOpen, setWaModalOpen] = useState(false)
+  const [waRecipient, setWaRecipient] = useState<RecipientInfo>({})
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"add" | "edit">("add")
@@ -214,7 +217,27 @@ export function AdminCustomersPage() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-slate-700 font-medium">{customer.email}</p>
-                    <p className="text-xs text-slate-500">{customer.phone || '-'}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-xs text-slate-500">{customer.phone || '-'}</p>
+                      {customer.phone && (
+                        <button
+                          onClick={() => {
+                            setWaRecipient({
+                              name: customer.name,
+                              phone: customer.phone || "",
+                              address: customer.address || "",
+                              packageName: customer.latest_order?.paket.nama || "",
+                              type: "general"
+                            })
+                            setWaModalOpen(true)
+                          }}
+                          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                          title="Chat WA Pelanggan"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {customer.latest_order ? (
@@ -342,6 +365,13 @@ export function AdminCustomersPage() {
           </div>
         </div>
       )}
+      {/* WhatsApp Template Modal */}
+      <WhatsAppTemplateModal
+        isOpen={waModalOpen}
+        onClose={() => setWaModalOpen(false)}
+        role="admin"
+        recipient={waRecipient}
+      />
     </div>
   )
 }

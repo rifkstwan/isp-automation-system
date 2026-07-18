@@ -49,6 +49,25 @@ class MikrotikService
         return $this->device;
     }
 
+    /**
+     * Simple ping test — attempts to connect and run a lightweight command.
+     * Returns true if connection succeeds.
+     */
+    public function testPing(): bool
+    {
+        if (!$this->client) return false;
+        if ($this->client === 'DEMO_MODE') return true;
+
+        try {
+            $query = new Query('/system/identity/print');
+            $result = $this->client->query($query)->read();
+            return !empty($result);
+        } catch (\Exception $e) {
+            Log::error('Mikrotik testPing Failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     public function addPppoeSecret($username, $password, $profile = 'default', $comment = '')
     {
         if (!$this->client) return false;
@@ -206,4 +225,26 @@ class MikrotikService
             return false;
         }
     }
+
+    /**
+     * Fetch all existing PPPoE secrets directly from physical Mikrotik router
+     */
+    public function getPppoeSecrets(): array
+    {
+        if (!$this->client) return [];
+        if ($this->client === 'DEMO_MODE') {
+            return [
+                ['name' => 'pppoe_rifkisetiawan_24', 'service' => 'pppoe', 'profile' => 'Paket Basic', 'disabled' => 'false', 'comment' => 'Demo User'],
+            ];
+        }
+
+        try {
+            $query = new Query('/ppp/secret/print');
+            return $this->client->query($query)->read();
+        } catch (\Exception $e) {
+            Log::error('Mikrotik getPppoeSecrets Failed: ' . $e->getMessage());
+            return [];
+        }
+    }
 }
+

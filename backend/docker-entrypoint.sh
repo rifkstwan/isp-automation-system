@@ -73,11 +73,11 @@ else
     echo "ℹ️  Database sudah di-seed sebelumnya. Skip seeding."
 fi
 
-# ─────────────── Cache Konfigurasi ───────────────
-echo "⚡ Caching konfigurasi..."
-php artisan config:cache 2>/dev/null || true
-php artisan route:cache 2>/dev/null || true
-echo "✅ Cache selesai!"
+# ─────────────── Clear Cache untuk Development ───────────────
+echo "⚡ Membersihkan cache konfigurasi..."
+php artisan config:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
+echo "✅ Cache dibersihkan!"
 
 echo ""
 echo "🚀 Backend siap! Berjalan di port 9000 (via Nginx: http://localhost)"

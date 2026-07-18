@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "../../contexts/AuthContext"
 import { useMyOrders } from "../../hooks/useOrders"
 import { useTickets } from "../../hooks/useTickets"
@@ -22,15 +23,28 @@ import { useMyTestimonial, useSubmitTestimonial } from "../../hooks/useTestimoni
 import { useMidtrans } from "../../hooks/useMidtrans"
 
 export function UserDashboardPage() {
-  const { user } = useAuth()
-  const { data: orders } = useMyOrders()
+  useAuth()
+  const { data: orders, refetch: refetchOrders } = useMyOrders()
   const { data: tickets } = useTickets()
-  const { data: traffic } = useTraffic()
+  const { data: traffic, refetch: refetchTraffic } = useTraffic()
+
+  // Fetch Billings
+  const { data: billings = [], refetch: refetchBillings } = useQuery({
+    queryKey: ["my-billings"],
+    queryFn: async () => {
+      const res = await api.get("/my-billings")
+      return res.data
+    },
+    refetchInterval: 5000,
+  })
+
+  // Calculated stats from billings
+  const unpaidBillings = billings?.filter((b: any) => b.status === "unpaid" || b.status === "overdue") || []
+  const latestUnpaidBilling = unpaidBillings.length > 0 ? unpaidBillings[0] : null
 
   // Calculated stats from orders
   const pendingOrders = orders?.filter((o) => o.status === "pending") || []
-  const activeOrders = orders?.filter((o) => o.status === "aktif") || []
-  const pendingCount = pendingOrders.length
+  const pendingCount = pendingOrders.length + unpaidBillings.length
 
   // Calculated stats from tickets
   const activeTicketsCount = tickets?.filter(t => t.status !== "selesai" && t.status !== "ditolak").length || 0
@@ -38,18 +52,48 @@ export function UserDashboardPage() {
   const completedTicketsCount = tickets?.filter(t => t.status === "selesai").length || 0
 
   // Get the most relevant order to display
-  const currentOrder = orders?.find(o => o.status === "aktif" || o.status === "suspend" || o.status === "dibayar") || null
+  const currentOrder = orders?.find(o => o.status === "aktif" || o.status === "dibayar" || o.status === "pending" || o.status === "suspend") || null
   const latestPendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null
+
+  // Choose which bill to display for quick payment
+  const activePayment = latestPendingOrder 
+    ? {
+        type: 'order',
+        id: latestPendingOrder.id,
+        nama: latestPendingOrder.paket.nama,
+        kecepatan: latestPendingOrder.paket.kecepatan,
+        invoiceNo: `ORD-${String(latestPendingOrder.id).padStart(3, '0')}`,
+        total: latestPendingOrder.total_harga
+      }
+    : latestUnpaidBilling 
+      ? {
+          type: 'billing',
+          id: latestUnpaidBilling.id,
+          nama: latestUnpaidBilling.order?.paket?.nama || currentOrder?.paket?.nama || 'Layanan WiFi',
+          kecepatan: latestUnpaidBilling.order?.paket?.kecepatan || currentOrder?.paket?.kecepatan || 0,
+          invoiceNo: `INV-${String(latestUnpaidBilling.id).padStart(3, '0')}`,
+          total: latestUnpaidBilling.jumlah_tagihan
+        }
+      : null;
 
   const { data: myTestimonial } = useMyTestimonial()
   const submitTestimonial = useSubmitTestimonial()
   const [rating, setRating] = useState(5)
   const [content, setContent] = useState("")
+  const [roleText, setRoleText] = useState("")
   const [isTestiEditing, setIsTestiEditing] = useState(false)
+
+  useEffect(() => {
+    if (myTestimonial) {
+      setRating(myTestimonial.rating || 5)
+      setContent(myTestimonial.content || "")
+      setRoleText(myTestimonial.role || "")
+    }
+  }, [myTestimonial])
 
   const handleTestimonialSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    submitTestimonial.mutate({ rating, content }, {
+    submitTestimonial.mutate({ rating, content, role: roleText }, {
       onSuccess: () => {
         setIsTestiEditing(false)
         alert("Terima kasih! Ulasan Anda berhasil dikirim.")
@@ -57,31 +101,34 @@ export function UserDashboardPage() {
     })
   }
 
+
   const { isReady: isMidtransReady } = useMidtrans()
   const [isPaying, setIsPaying] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'va'|'qris'>('va')
 
-  const handlePayment = async (orderId: number) => {
+  const handlePayment = async (id: number, isOrder = true) => {
     try {
       setIsPaying(true)
-      const res = await api.post(`/orders/${orderId}/pay`)
+      const res = await api.post(isOrder ? `/orders/${id}/pay` : `/billings/${id}/pay`)
       const snapToken = res.data.snap_token
 
       // @ts-ignore
       window.snap.pay(snapToken, {
         onSuccess: async function () {
           try {
-            await api.post(`/orders/${orderId}/demo-pay-success`)
+            await api.post(isOrder ? `/orders/${id}/demo-pay-success` : `/billings/${id}/demo-pay-success`)
           } catch (e) {
             console.error(e)
           }
           alert("Pembayaran berhasil!");
           refetchOrders();
+          refetchBillings();
           refetchTraffic();
         },
         onPending: function () {
           alert("Menunggu pembayaran Anda!");
           refetchOrders();
+          refetchBillings();
         },
         onError: function () {
           alert("Pembayaran gagal!");
@@ -153,10 +200,12 @@ export function UserDashboardPage() {
                 <span className={`px-2.5 py-1 text-[11px] font-bold rounded-md ${
                     currentOrder?.status === 'aktif' ? 'bg-emerald-50 text-emerald-600' : 
                     currentOrder?.status === 'dibayar' ? 'bg-blue-50 text-blue-600' : 
+                    currentOrder?.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
                     currentOrder?.status === 'suspend' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
                   }`}>
                   {currentOrder?.status === 'aktif' ? 'Aktif' : 
                    currentOrder?.status === 'dibayar' ? 'Menunggu Pemasangan' : 
+                   currentOrder?.status === 'pending' ? 'Menunggu Pembayaran' : 
                    currentOrder?.status === 'suspend' ? 'Terisolir (Belum Bayar)' : 'Tidak Aktif'}
                 </span>
               </div>
@@ -165,18 +214,18 @@ export function UserDashboardPage() {
             {/* Tagihan */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:shadow-md transition-shadow group">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform ${latestPendingOrder ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform ${activePayment ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
                   <CreditCard className="w-4 h-4" />
                 </div>
                 <h3 className="text-[13px] font-bold text-slate-500">Tagihan Bulan Ini</h3>
               </div>
               <div>
                 <p className="text-3xl font-extrabold text-slate-800 tracking-tight">
-                  {latestPendingOrder ? formatRupiah(latestPendingOrder.total_harga) : 'Rp0'}
+                  {activePayment ? formatRupiah(activePayment.total) : 'Rp0'}
                 </p>
               </div>
               <div className="mt-5 pt-4 border-t border-slate-100 flex justify-between items-center">
-                {latestPendingOrder ? (
+                {activePayment ? (
                   <>
                     <span className="text-[12px] font-bold text-orange-500 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" /> Belum Dibayar
@@ -258,6 +307,11 @@ export function UserDashboardPage() {
                 <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">
                   <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                   Menunggu Pemasangan
+                </span>
+              ) : currentOrder?.status === 'pending' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 text-xs font-bold rounded-full border border-amber-100">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Menunggu Pembayaran
                 </span>
               ) : currentOrder?.status === 'suspend' ? (
                 <span className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full border border-red-100">
@@ -417,6 +471,19 @@ export function UserDashboardPage() {
                   </div>
                 </div>
                 <div className="mb-4">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Pekerjaan / Status (Opsional)</label>
+                  <p className="text-xs text-slate-400 mb-2">
+                    Misal: <em>Pengusaha Cafe, Guru SD, Mahasiswa</em>. Biarkan kosong untuk menggunakan otomatisasi paket & lokasi Anda.
+                  </p>
+                  <input
+                    type="text"
+                    value={roleText}
+                    onChange={(e) => setRoleText(e.target.value)}
+                    placeholder="Contoh: Pengusaha Cafe Purwodadi (Biarkan kosong untuk otomatisasi)"
+                    className="w-full border-slate-200 rounded-xl focus:ring-blue-500 focus:border-blue-500 p-3 text-sm"
+                  />
+                </div>
+                <div className="mb-4">
                   <label className="block text-sm font-bold text-slate-700 mb-2">Pengalaman Anda</label>
                   <textarea
                     required
@@ -534,7 +601,7 @@ export function UserDashboardPage() {
           <div className="pt-5 border-t border-slate-100">
             <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4">Rincian Langganan</h4>
 
-            {latestPendingOrder || currentOrder ? (
+            {activePayment || currentOrder ? (
               <>
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-6">
                   <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-200/60">
@@ -543,10 +610,10 @@ export function UserDashboardPage() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-slate-800">
-                        {(latestPendingOrder || currentOrder)?.paket.nama}
+                        {activePayment ? activePayment.nama : currentOrder?.paket.nama}
                       </p>
                       <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                        INV-{String((latestPendingOrder || currentOrder)?.id).padStart(3, '0')}
+                        {activePayment ? activePayment.invoiceNo : `INV-${String(currentOrder?.id).padStart(3, '0')}`}
                       </p>
                     </div>
                   </div>
@@ -554,7 +621,7 @@ export function UserDashboardPage() {
                   <div className="space-y-2">
                     <div className="flex items-start gap-2">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                      <span className="text-[11px] font-medium text-slate-600">Kecepatan stabil {(latestPendingOrder || currentOrder)?.paket.kecepatan} Mbps</span>
+                      <span className="text-[11px] font-medium text-slate-600">Kecepatan stabil {activePayment ? activePayment.kecepatan : currentOrder?.paket.kecepatan} Mbps</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
@@ -566,13 +633,13 @@ export function UserDashboardPage() {
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-[13px] font-extrabold text-slate-800">Total Tagihan</span>
                   <span className="text-lg font-extrabold text-orange-500">
-                    {formatRupiah((latestPendingOrder || currentOrder)?.total_harga || 0)}
+                    {formatRupiah(activePayment ? activePayment.total : 0)}
                   </span>
                 </div>
 
-                {latestPendingOrder ? (
+                {activePayment ? (
                   <button
-                    onClick={() => handlePayment(latestPendingOrder.id)}
+                    onClick={() => handlePayment(activePayment.id, activePayment.type === 'order')}
                     disabled={isPaying || !isMidtransReady}
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-orange-500/25 transition-all active:scale-[0.98] hover:-translate-y-0.5 flex justify-center items-center gap-2 disabled:opacity-50 disabled:active:scale-100 disabled:hover:translate-y-0 disabled:cursor-not-allowed">
                     {!isMidtransReady ? "Memuat Gateway..." : isPaying ? "Memproses..." : "Lanjutkan Pembayaran"}

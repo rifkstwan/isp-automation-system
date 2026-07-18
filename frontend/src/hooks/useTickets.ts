@@ -23,7 +23,9 @@ export function useTickets() {
       const res = await api.get("/tickets")
       return res.data
     },
-    refetchInterval: 5000,
+    staleTime: 10000,
+    gcTime: 300000,
+    refetchInterval: 10000,
   })
 }
 

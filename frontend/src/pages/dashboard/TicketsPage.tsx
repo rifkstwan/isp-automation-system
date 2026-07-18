@@ -14,6 +14,11 @@ export function TicketsPage() {
   const [foto, setFoto] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const getStorageUrl = (path: string) => {
+    const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost';
+    return `${baseUrl}/storage/${path}`;
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const data = new FormData()
@@ -101,7 +106,7 @@ export function TicketsPage() {
 
                     {ticket.foto && (
                        <div className="mt-4 flex items-center gap-2">
-                         <a href={`http://localhost:8000/storage/${ticket.foto}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 text-[11px] font-bold rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors">
+                         <a href={getStorageUrl(ticket.foto)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 text-[11px] font-bold rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors">
                             <ImagePlus className="w-3.5 h-3.5" /> Lihat Lampiran Foto
                          </a>
                        </div>

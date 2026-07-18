@@ -1,10 +1,222 @@
 import { Link } from "react-router-dom"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import api from "../../services/api"
 import { usePublicTestimonials } from "../../hooks/useTestimonials"
-import { Star, Wifi, Rocket, Zap, Shield, Crown } from "lucide-react"
+import { Star, Wifi, Rocket, Zap, Shield, Crown, MapPin, Loader2, Compass, CheckCircle2, X, Navigation, Phone, User, Mail } from "lucide-react"
 import "./HomePage.css"
+
+declare global {
+  interface Window {
+    L: any
+  }
+}
+
+function SurveyMapPicker({
+  onLocationSelect
+}: {
+  onLocationSelect: (address: string, lat: number, lng: number) => void
+}) {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
+  const [isMapLoaded, setIsMapLoaded] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [isGeocoding, setIsGeocoding] = useState(false)
+  const [selectedLat, setSelectedLat] = useState<number>(-6.9932)
+  const [selectedLng, setSelectedLng] = useState<number>(110.4203)
+  const [selectedAddressStr, setSelectedAddressStr] = useState<string>("Memuat alamat...")
+
+  const defaultLat = -6.9932
+  const defaultLng = 110.4203
+
+  useEffect(() => {
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link")
+      link.id = "leaflet-css"
+      link.rel = "stylesheet"
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      document.head.appendChild(link)
+    }
+
+    if (window.L) {
+      setIsMapLoaded(true)
+      return
+    }
+
+    if (!document.getElementById("leaflet-js")) {
+      const script = document.createElement("script")
+      script.id = "leaflet-js"
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      script.onload = () => setIsMapLoaded(true)
+      document.body.appendChild(script)
+    }
+  }, [])
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setIsGeocoding(true)
+    setSelectedLat(lat)
+    setSelectedLng(lng)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+      )
+      const data = await res.json()
+      const displayAddress = data.display_name || `Koor: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      setSelectedAddressStr(displayAddress)
+      onLocationSelect(displayAddress, lat, lng)
+    } catch (e) {
+      const fallbackAddress = `Koor: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      setSelectedAddressStr(fallbackAddress)
+      onLocationSelect(fallbackAddress, lat, lng)
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isMapLoaded || !mapContainerRef.current || mapInstanceRef.current) return
+
+    const L = window.L
+    const map = L.map(mapContainerRef.current).setView([defaultLat, defaultLng], 14)
+    mapInstanceRef.current = map
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map)
+
+    const marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map)
+    markerRef.current = marker
+
+    marker.on("dragend", () => {
+      const position = marker.getLatLng()
+      reverseGeocode(position.lat, position.lng)
+    })
+
+    map.on("click", (e: any) => {
+      const { lat, lng } = e.latlng
+      marker.setLatLng([lat, lng])
+      reverseGeocode(lat, lng)
+    })
+
+    if (navigator.geolocation) {
+      setIsLocating(true)
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude
+          const lng = pos.coords.longitude
+          map.setView([lat, lng], 16)
+          marker.setLatLng([lat, lng])
+          reverseGeocode(lat, lng)
+          setIsLocating(false)
+        },
+        () => setIsLocating(false),
+        { timeout: 5000 }
+      )
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+      }
+    }
+  }, [isMapLoaded])
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation || !mapInstanceRef.current || !markerRef.current) return
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        mapInstanceRef.current.setView([lat, lng], 17)
+        markerRef.current.setLatLng([lat, lng])
+        reverseGeocode(lat, lng)
+        setIsLocating(false)
+      },
+      () => {
+        alert("Gagal mengakses lokasi GPS.")
+        setIsLocating(false)
+      },
+      { enableHighAccuracy: true }
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ── MAP CONTAINER (HERO INTERACTION AREA: 450PX) ── */}
+      <div className="relative rounded-2xl overflow-hidden border border-[#E5E7EB] shadow-xs group bg-[#F8FAFC]">
+        
+        {/* Floating Instruction Card Top Left */}
+        <div 
+          className="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-[#E5E7EB] shadow-md flex items-center gap-2.5 text-xs text-[#111827] font-semibold"
+          style={{ zIndex: 999 }}
+        >
+          <span className="w-2 h-2 rounded-full bg-[#2563EB] animate-ping" />
+          <span>Klik pada peta atau geser pin untuk menentukan lokasi survey</span>
+        </div>
+
+        {/* GPS Button Overlay Top Right */}
+        <button
+          type="button"
+          onClick={handleGetCurrentLocation}
+          disabled={isLocating}
+          style={{ zIndex: 999 }}
+          className="absolute top-4 right-4 flex items-center gap-2 bg-white hover:bg-blue-50/80 text-[#2563EB] font-bold text-xs px-4 py-2.5 rounded-xl shadow-md border border-[#E5E7EB] transition-all active:scale-95 disabled:opacity-60"
+        >
+          {isLocating
+            ? <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
+            : <Navigation className="w-4 h-4 text-[#2563EB]" />
+          }
+          <span>{isLocating ? "Mencari GPS..." : "GPS Saya"}</span>
+        </button>
+
+        {/* Leaflet Map Target Div */}
+        <div ref={mapContainerRef} className="w-full z-10" style={{ height: 300 }} />
+
+        {!isMapLoaded && (
+          <div className="absolute inset-0 bg-slate-50/90 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-20">
+            <Loader2 className="w-5 h-5 animate-spin text-[#2563EB]" />
+            <span className="text-xs text-[#6B7280] font-medium">Memuat peta...</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── AUTO-DETECTED ADDRESS & COORDINATES INFO CARD ── */}
+      <div className="bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-1.5">
+            <Compass className="w-3.5 h-3.5 text-[#2563EB]" /> Detail Lokasi Terdeteksi
+          </span>
+          {isGeocoding && (
+            <span className="text-[11px] font-medium text-[#2563EB] flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Memperbarui alamat...
+            </span>
+          )}
+        </div>
+
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-3 text-xs text-[#111827] font-medium leading-relaxed shadow-2xs">
+          <p className="text-[#6B7280] text-[10px] uppercase tracking-wider font-bold mb-0.5">Alamat Terdeteksi Peta</p>
+          <p className="text-[#111827] font-semibold">{selectedAddressStr}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-white border border-[#E5E7EB] rounded-lg p-2.5">
+            <p className="text-[#6B7280] text-[10px] uppercase tracking-wider font-bold">Latitude</p>
+            <p className="text-xs font-bold text-[#111827] mt-0.5">{selectedLat.toFixed(6)}</p>
+          </div>
+          <div className="bg-white border border-[#E5E7EB] rounded-lg p-2.5">
+            <p className="text-[#6B7280] text-[10px] uppercase tracking-wider font-bold">Longitude</p>
+            <p className="text-xs font-bold text-[#111827] mt-0.5">{selectedLng.toFixed(6)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 type Package = {
   id: number
@@ -106,6 +318,64 @@ export function HomePage() {
   const [searchArea, setSearchArea] = useState("")
   const [checkResult, setCheckResult] = useState<'idle' | 'covered' | 'partial' | 'not_covered' | 'empty'>('idle')
 
+  // Verified eligible survey locations from database
+  const { data: verifiedLocations = [] } = useQuery<any[]>({
+    queryKey: ["public-verified-locations"],
+    queryFn: async () => {
+      const res = await api.get("/public/survey-requests/verified")
+      return res.data
+    },
+  })
+
+  // Survey Request Modal State
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false)
+  const [surveyNama, setSurveyNama] = useState("")
+  const [surveyPhone, setSurveyPhone] = useState("")
+  const [surveyEmail, setSurveyEmail] = useState("")
+  const [surveyAlamat, setSurveyAlamat] = useState("")
+  const [surveyLat, setSurveyLat] = useState("")
+  const [surveyLng, setSurveyLng] = useState("")
+  const [surveyCatatan, setSurveyCatatan] = useState("")
+  const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false)
+  const [surveySuccessMsg, setSurveySuccessMsg] = useState("")
+  const [surveyErrorMsg, setSurveyErrorMsg] = useState("")
+
+
+  const handleLocationSelect = (address: string, lat: number, lng: number) => {
+    setSurveyAlamat(address)
+    setSurveyLat(lat.toFixed(6))
+    setSurveyLng(lng.toFixed(6))
+  }
+
+  const handleSurveySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingSurvey(true)
+    setSurveyErrorMsg("")
+    setSurveySuccessMsg("")
+    try {
+      const res = await api.post("/public/survey-requests", {
+        nama: surveyNama,
+        phone: surveyPhone,
+        email: surveyEmail,
+        alamat: surveyAlamat,
+        latitude: surveyLat,
+        longitude: surveyLng,
+        catatan: surveyCatatan,
+      })
+      setSurveySuccessMsg(res.data.message || "Permohonan survey berhasil dikirim!")
+      setSurveyNama("")
+      setSurveyPhone("")
+      setSurveyEmail("")
+      setSurveyAlamat("")
+      setSurveyCatatan("")
+    } catch (err: any) {
+
+      setSurveyErrorMsg(err.response?.data?.message || "Gagal mengirimkan permohonan survey.")
+    } finally {
+      setIsSubmittingSurvey(false)
+    }
+  }
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener("scroll", onScroll, { passive: true })
@@ -120,7 +390,7 @@ export function HomePage() {
     },
   })
 
-  const { data: publicTestimonials = [], isLoading: isLoadingTestimonials } = usePublicTestimonials()
+  const { data: publicTestimonials = [] } = usePublicTestimonials()
 
   const handleCheckArea = () => {
     if (!searchArea.trim()) {
@@ -129,6 +399,16 @@ export function HomePage() {
     }
     
     const query = searchArea.toLowerCase();
+
+    // Cek apakah lokasi ini pernah disetujui LAYAK oleh teknisi
+    const isVerifiedLayak = verifiedLocations.some((loc: any) => 
+      (loc.alamat && loc.alamat.toLowerCase().includes(query)) ||
+      (loc.catatan && loc.catatan.toLowerCase().includes(query))
+    );
+    if (isVerifiedLayak) {
+      setCheckResult('covered');
+      return;
+    }
     
     // Cek apakah itu masuk daftar desa jauh/pelosok
     const isFarVillage = UNCOVERED_VILLAGES.some(village => query.includes(village));
@@ -150,6 +430,7 @@ export function HomePage() {
       setCheckResult('not_covered');
     }
   };
+
 
   // Gabungkan dummy dengan testimoni asli dari database
   const allTestimonials = [
@@ -773,9 +1054,17 @@ export function HomePage() {
                     <div className="flex-1">
                       <h4 className="text-[18px] font-bold text-blue-900" style={{ marginBottom: '8px' }}>Perlu Survey Lapangan</h4>
                       <p className="text-[14.5px] leading-relaxed text-blue-800" style={{ marginBottom: '20px' }}>Kecamatan Anda terjangkau, namun karena spesifik di area desa/pelosok, kami perlu mengecek batas maksimal tarikan tiang ke rumah Anda.</p>
-                      <a href="https://wa.me/628122577686?text=Halo%20Admin,%20saya%20ingin%20meminta%20survey%20lokasi%20pemasangan%20WiFi%20di%20desa%20saya." target="_blank" rel="noreferrer" className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-[14.5px] rounded-xl transition-all w-full md:w-auto" style={{ padding: '12px 24px' }}>
-                        Hubungi via WhatsApp
-                      </a>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setIsSurveyModalOpen(true)}
+                          className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-[14.5px] rounded-xl transition-all shadow-md hover:shadow-lg gap-2" style={{ padding: '12px 24px' }}
+                        >
+                          <MapPin className="w-4 h-4" /> Tandai Maps &amp; Ajukan Survey
+                        </button>
+                        <a href="https://wa.me/628122577686?text=Halo%20Admin,%20saya%20ingin%20meminta%20survey%20lokasi%20pemasangan%20WiFi%20di%20desa%20saya." target="_blank" rel="noreferrer" className="inline-flex items-center justify-center bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-[14.5px] rounded-xl transition-all" style={{ padding: '12px 20px' }}>
+                          Chat WhatsApp
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -787,13 +1076,22 @@ export function HomePage() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-[18px] font-bold text-orange-900" style={{ marginBottom: '8px' }}>Belum Terjangkau</h4>
-                      <p className="text-[14.5px] leading-relaxed text-orange-800" style={{ marginBottom: '20px' }}>Mohon maaf, jaringan fiber optik kami belum masuk ke area Anda. Kami mencatat wilayah ini untuk prioritas perluasan (ODP) selanjutnya.</p>
-                      <button onClick={() => setCheckResult('idle')} className="inline-flex items-center justify-center bg-orange-200 hover:bg-orange-300 text-orange-900 font-bold text-[14.5px] rounded-xl transition-all w-full md:w-auto" style={{ padding: '12px 24px', border: 'none' }}>
-                        Tutup Pesan
-                      </button>
+                      <p className="text-[14.5px] leading-relaxed text-orange-800" style={{ marginBottom: '20px' }}>Jaringan fiber optik kami belum terpasang otomatis di area ini. Anda bisa mengajukan survey gratis agar teknisi kami mengecek ketersediaan jalur ke rumah Anda.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => setIsSurveyModalOpen(true)} 
+                          className="inline-flex items-center justify-center bg-orange-600 hover:bg-orange-700 text-white font-bold text-[14.5px] rounded-xl transition-all shadow-md hover:shadow-lg gap-2" style={{ padding: '12px 24px' }}
+                        >
+                          <MapPin className="w-4 h-4" /> Tandai Maps &amp; Ajukan Survey Gratis
+                        </button>
+                        <button onClick={() => setCheckResult('idle')} className="inline-flex items-center justify-center bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-[14.5px] rounded-xl transition-all" style={{ padding: '12px 20px', border: 'none' }}>
+                          Tutup Pesan
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
+
                 
                 {checkResult === 'empty' && (
                   <div className="flex flex-col md:flex-row items-center md:items-start text-center md:text-left" style={{ gap: '20px' }}>
@@ -1099,7 +1397,10 @@ export function HomePage() {
                 <li><a href="#about">Tentang Kami</a></li>
                 <li><a href="#testimonials">Testimonial</a></li>
                 <li><a href="#blog">Berita & Promo</a></li>
-                <li><a href="#contact">Kontak Sales</a></li>
+                <li><a href="#tos">Syarat &amp; Ketentuan</a></li>
+                <li><a href="#privacy">Kebijakan Privasi</a></li>
+                <li><a href="#fup">Kebijakan FUP</a></li>
+                <li><a href="#faq">Pusat Bantuan</a></li>
               </ul>
             </div>
 
@@ -1108,12 +1409,8 @@ export function HomePage() {
               <h4 className="footer-title">Legal</h4>
               <ul className="footer-links">
                 <li><a href="#tos">Syarat & Ketentuan</a></li>
-                <li><a href="#privacy">Kebijakan Privasi</a></li>
-                <li><a href="#fup">Kebijakan FUP</a></li>
-                <li><a href="#faq">Pusat Bantuan</a></li>
               </ul>
             </div>
-
           </div>
 
           <div className="footer-bottom">
@@ -1123,6 +1420,202 @@ export function HomePage() {
         </footer>
 
       </div>
+
+      {/* ── SURVEY LOCATION REQUEST MODAL (COMPACT REFINED ENTERPRISE UI) ── */}
+      {isSurveyModalOpen && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-5"
+          style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(8px)' }}
+        >
+          <div
+            className="bg-[#F8FAFC] w-full max-w-3xl rounded-2xl flex flex-col overflow-hidden shadow-2xl border border-[#E5E7EB] animate-in zoom-in-95 duration-200"
+            style={{ maxHeight: '90vh', boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)' }}
+          >
+            
+            {/* ─── FIXED MODAL HEADER (REFINED & PROPORTIONAL) ─── */}
+            <div className="px-6 py-4.5 border-b border-[#E5E7EB] flex items-center justify-between shrink-0 bg-white">
+              <div>
+                <h3 className="text-lg font-bold text-[#111827] tracking-tight">Form Pengajuan Survey Lokasi</h3>
+                <p className="text-xs text-[#6B7280] mt-0.5">Lengkapi data berikut untuk pemeriksaan jangkauan jaringan oleh teknisi kami.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsSurveyModalOpen(false); setSurveySuccessMsg(""); setSurveyErrorMsg("") }}
+                className="w-8 h-8 rounded-full border border-[#E5E7EB] bg-white hover:bg-slate-100 text-[#6B7280] hover:text-[#111827] flex items-center justify-center transition-all shrink-0 ml-4 shadow-2xs"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* ─── SCROLLABLE BODY (COMPACT SPACING) ─── */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 bg-[#F8FAFC]">
+              {surveySuccessMsg ? (
+                /* ── SUCCESS STATE ── */
+                <div className="flex flex-col items-center justify-center text-center py-10 gap-4 border border-[#E5E7EB] rounded-xl p-6 bg-white shadow-2xs">
+                  <div className="w-12 h-12 rounded-full bg-[#10B981]/15 flex items-center justify-center text-[#10B981]">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-[#111827]">Permohonan Berhasil Terkirim!</h4>
+                    <p className="text-xs text-[#6B7280] mt-1 leading-relaxed max-w-sm mx-auto">{surveySuccessMsg}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsSurveyModalOpen(false); setSurveySuccessMsg("") }}
+                    className="mt-2 w-full max-w-xs bg-[#111827] hover:bg-black text-white font-semibold text-xs h-10 rounded-xl transition-all shadow-md"
+                  >
+                    Tutup Dialog
+                  </button>
+                </div>
+              ) : (
+                /* ── ENTERPRISE CARD-BASED FORM ── */
+                <form id="surveyForm" onSubmit={handleSurveySubmit} className="space-y-4">
+                  
+                  {surveyErrorMsg && (
+                    <div className="flex items-start gap-2.5 p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <X className="w-4 h-4 text-[#EF4444] mt-0.5 shrink-0" />
+                      <p className="text-xs text-red-700 font-medium">{surveyErrorMsg}</p>
+                    </div>
+                  )}
+
+                  {/* ── CARD 1: INFORMASI PEMOHON ── */}
+                  <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
+                    <div className="pb-1 border-b border-[#E5E7EB]">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">Informasi Pemohon</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Nama Lengkap Input with Icon */}
+                      <div>
+                        <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                          Nama Lengkap <span className="text-[#EF4444] ml-0.5">*</span>
+                        </label>
+                        <div className="relative">
+                          <User className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            required
+                            value={surveyNama}
+                            onChange={(e) => setSurveyNama(e.target.value)}
+                            placeholder="Contoh: Budi Santoso"
+                            className="w-full h-11 pl-9 pr-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:border-[#2563EB] focus:ring-3 focus:ring-[#2563EB]/10 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Nomor WhatsApp Input with Icon */}
+                      <div>
+                        <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                          Nomor WhatsApp <span className="text-[#EF4444] ml-0.5">*</span>
+                        </label>
+                        <div className="relative">
+                          <Phone className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="tel"
+                            required
+                            value={surveyPhone}
+                            onChange={(e) => setSurveyPhone(e.target.value)}
+                            placeholder="Contoh: 08123456789"
+                            className="w-full h-11 pl-9 pr-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:border-[#2563EB] focus:ring-3 focus:ring-[#2563EB]/10 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Alamat Email Input for Notifications */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                          Alamat Email <span className="text-[#6B7280] font-normal">(untuk pemberitahuan hasil survey)</span>
+                        </label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="email"
+                            value={surveyEmail}
+                            onChange={(e) => setSurveyEmail(e.target.value)}
+                            placeholder="Contoh: pemohon@gmail.com"
+                            className="w-full h-11 pl-9 pr-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:border-[#2563EB] focus:ring-3 focus:ring-[#2563EB]/10 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* ── CARD 2: PETA INTERAKTIF HERO ── */}
+                  <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
+                    <div className="pb-1 border-b border-[#E5E7EB]">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">Titik Lokasi Survey Peta</h4>
+                    </div>
+
+                    <SurveyMapPicker onLocationSelect={handleLocationSelect} />
+                  </div>
+
+                  {/* ── CARD 3: ALAMAT & PATOKAN ── */}
+                  <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
+                    <div className="pb-1 border-b border-[#E5E7EB]">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">Alamat &amp; Catatan Pemasangan</h4>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                        Alamat Lengkap Pemasangan <span className="text-[#EF4444] ml-0.5">*</span>
+                      </label>
+                      <textarea
+                        required
+                        rows={2}
+                        value={surveyAlamat}
+                        onChange={(e) => setSurveyAlamat(e.target.value)}
+                        placeholder="Alamat akan terisi otomatis saat pin di peta digeser, atau Anda dapat mengetik manual..."
+                        className="w-full p-3 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:border-[#2563EB] focus:ring-3 focus:ring-[#2563EB]/10 transition-all resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                        Catatan Patokan Lokasi <span className="text-[#6B7280] font-normal">(opsional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={surveyCatatan}
+                        onChange={(e) => setSurveyCatatan(e.target.value)}
+                        placeholder="Contoh: Rumah warna hijau depan Masjid Al-Hidayah"
+                        className="w-full h-11 px-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:border-[#2563EB] focus:ring-3 focus:ring-[#2563EB]/10 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                </form>
+              )}
+            </div>
+
+            {/* ─── FIXED FOOTER ─── */}
+            {!surveySuccessMsg && (
+              <div className="px-6 py-4 border-t border-[#E5E7EB] bg-white flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsSurveyModalOpen(false)}
+                  className="px-5 h-10 rounded-xl border border-[#E5E7EB] bg-white hover:bg-slate-50 text-[#374151] font-semibold text-xs transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  form="surveyForm"
+                  disabled={isSubmittingSurvey || !surveyNama || !surveyPhone || !surveyAlamat}
+                  className="px-6 h-10 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-2 bg-[#2563EB] hover:bg-blue-700 shadow-md shadow-blue-600/20 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingSurvey ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...</>
+                  ) : (
+                    "Kirim Pengajuan Survey"
+                  )}
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
     </div>
   )

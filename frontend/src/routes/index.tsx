@@ -3,10 +3,11 @@ import { useAuth } from "../contexts/AuthContext"
 import { HomePage } from "../pages/public/HomePage"
 import { LoginPage } from "../pages/auth/LoginPage"
 import { RegisterPage } from "../pages/auth/RegisterPage"
+import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage"
+import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage"
 import { UserDashboardLayout } from "../layouts/UserDashboardLayout"
 import { UserDashboardPage } from "../pages/dashboard/UserDashboardPage"
 import { ProfilePage } from "../pages/dashboard/ProfilePage"
-import { OrderPage } from "../pages/customer/OrderPage"
 import { MyOrdersPage } from "../pages/customer/MyOrdersPage"
 import { AdminDashboardLayout } from "../layouts/AdminDashboardLayout"
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage"
@@ -41,15 +42,7 @@ import { SchedulePage } from "../pages/dashboard/SchedulePage"
 import { NotificationsPage } from "../pages/dashboard/NotificationsPage"
 import { SettingsPage } from "../pages/dashboard/SettingsPage"
 
-function AdminPlaceholder({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-slate-500">
-      <div className="text-4xl mb-4">🚧</div>
-      <h2 className="text-xl font-bold text-slate-800 mb-2">Halaman {title}</h2>
-      <p>Fitur ini sedang dalam tahap pengembangan.</p>
-    </div>
-  )
-}
+
 
 function ProtectedRoute({
   children,
@@ -103,6 +96,8 @@ export function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/redirect" element={<SmartRedirect />} />
 
         {/* Customer */}

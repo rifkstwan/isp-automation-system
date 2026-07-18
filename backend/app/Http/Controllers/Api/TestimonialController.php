@@ -11,24 +11,57 @@ class TestimonialController extends Controller
     // Public API: get approved testimonials for landing page
     public function publicIndex()
     {
-        $testimonials = Testimonial::with('user:id,name')
+        $testimonials = Testimonial::with(['user', 'user.orders.paket'])
             ->where('is_published', true)
             ->latest()
             ->take(6)
             ->get()
             ->map(function ($item) {
+                $user = $item->user;
+                $roleLabel = 'Pelanggan Setia';
+
+                if ($user) {
+                    // Find active or latest order
+                    $latestOrder = $user->orders->where('status', 'aktif')->first() ?? $user->orders->first();
+                    $packageName = $latestOrder && $latestOrder->paket ? $latestOrder->paket->nama_paket : null;
+                    
+                    if ($packageName) {
+                        $roleLabel = "Pelanggan " . $packageName;
+                    }
+
+                    // Extract location / kecamatan from address (or latest order address)
+                    $userAddr = $user->address ?: ($latestOrder->alamat ?? null);
+                    if ($userAddr) {
+                        $cleanLoc = preg_replace('/(?:Link|Titik)\s*Maps:[\s\S]*/i', '', $userAddr);
+                        $parts = explode(',', $cleanLoc);
+                        $shortLoc = trim($parts[0]);
+                        if (!empty($shortLoc)) {
+                            $roleLabel .= " • " . $shortLoc;
+                        }
+                    }
+                }
+
+                $avatarUrl = null;
+                if ($user && $user->avatar) {
+                    $avatarUrl = asset('storage/' . $user->avatar);
+                }
+
+                // If user wrote a custom role (e.g. 'Pengusaha Cafe'), use it; otherwise fallback to auto-generated label
+                $finalRole = (!empty($item->role)) ? $item->role : $roleLabel;
+
                 return [
-                    'id' => $item->id,
-                    'quote' => $item->content,
-                    'name' => $item->user->name,
+                    'id'     => $item->id,
+                    'quote'  => $item->content,
+                    'name'   => $user->name ?? 'Pelanggan',
                     'rating' => $item->rating,
-                    'role' => 'Pelanggan',
-                    'avatar' => 'https://ui-avatars.com/api/?name=' . urlencode($item->user->name) . '&background=random'
+                    'role'   => $finalRole,
+                    'avatar' => $avatarUrl,
                 ];
             });
 
         return response()->json($testimonials);
     }
+
 
     // Customer API: get their own testimonial
     public function myTestimonial(Request $request)
@@ -41,18 +74,21 @@ class TestimonialController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'rating' => 'required|integer|min:1|max:5',
-            'content' => 'required|string|max:1000'
+            'rating'  => 'required|integer|min:1|max:5',
+            'content' => 'required|string|max:1000',
+            'role'    => 'nullable|string|max:100',
         ]);
 
         $testimonial = Testimonial::updateOrCreate(
             ['user_id' => $request->user()->id],
             [
-                'rating' => $request->rating,
-                'content' => $request->content,
+                'rating'       => $request->rating,
+                'content'      => $request->content,
+                'role'         => $request->role,
                 'is_published' => false // require admin approval on update
             ]
         );
+
 
         return response()->json([
             'message' => 'Ulasan berhasil disimpan dan menunggu persetujuan admin.',

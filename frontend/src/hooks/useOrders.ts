@@ -4,18 +4,23 @@ import api from "../services/api"
 export type Order = {
   id: number
   paket_id: number
-  status: "pending" | "aktif" | "ditolak" | "selesai"
+  status: "pending" | "dibayar" | "aktif" | "ditolak" | "selesai" | "suspend"
   alamat: string
   catatan: string
   total_harga: number
   tanggal_mulai: string | null
   tanggal_selesai: string | null
   created_at: string
+  ip_address?: string | null
+  tipe_perangkat?: string | null
+  upgrade_requests?: any[]
   paket: {
     id: number
     nama: string
     kecepatan: number
     harga: number
+    durasi: number
+    fup?: string | null
   }
 }
 

@@ -66,14 +66,36 @@ class OrderController extends Controller
 
         $paket = Paket::findOrFail($request->paket_id);
 
+        // Auto-detect ODP matching kecamatan in customer address
+        $matchedDeviceId = null;
+        $alamatLower = strtolower($request->alamat);
+        $devices = \App\Models\NetworkDevice::where('is_active', true)->get();
+        foreach ($devices as $dev) {
+            $wilClean = strtolower(str_replace('kec.', '', $dev->wilayah ?? ''));
+            $wilClean = trim($wilClean);
+            if (strlen($wilClean) > 2 && str_contains($alamatLower, $wilClean)) {
+                $matchedDeviceId = $dev->id;
+                break;
+            }
+        }
+
+        // Sync installation address to user profile address
+        $user = $request->user();
+        if ($request->alamat && $user) {
+            $user->update(['address' => $request->alamat]);
+        }
+
         $order = Order::create([
-            'user_id'     => $request->user()->id,
-            'paket_id'    => $request->paket_id,
-            'alamat'      => $request->alamat,
-            'catatan'     => $request->catatan,
-            'total_harga' => $paket->harga,
-            'status'      => 'pending',
+            'user_id'           => $user->id,
+            'paket_id'          => $request->paket_id,
+            'alamat'            => $request->alamat,
+            'catatan'           => $request->catatan,
+            'total_harga'       => $paket->harga,
+            'status'            => 'pending',
+            'network_device_id' => $matchedDeviceId,
         ]);
+
+
 
         $order->load(['user', 'paket']);
 

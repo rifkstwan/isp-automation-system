@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeUserMail;
 use App\Services\WhatsAppService;
 
 class AuthController extends Controller
@@ -32,6 +34,13 @@ class AuthController extends Controller
 
         // Send Welcome Message via WhatsApp
         WhatsAppService::sendWelcomeMessage($user);
+
+        // Send Welcome Email via SMTP
+        try {
+            Mail::to($user->email)->send(new WelcomeUserMail($user));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed sending welcome email to ' . $user->email . ': ' . $e->getMessage());
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

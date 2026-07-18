@@ -26,10 +26,9 @@ class PaymentController extends Controller
 
     public function indexAdmin()
     {
-        // Ambil data Pemasangan (Orders) yang sudah lunas (Aktif/Selesai/Suspend)
-        // Karena awalnya statusnya pending, kalau sudah aktif berarti sudah dibayar/diterima
+        // Ambil data Pemasangan (Orders) yang sudah lunas (Dibayar/Aktif/Selesai/Suspend)
         $orders = Order::with(['user', 'paket'])
-            ->whereIn('status', ['aktif', 'selesai', 'suspend'])
+            ->whereIn('status', ['dibayar', 'aktif', 'selesai', 'suspend'])
             ->get()
             ->map(function ($order) {
                 return [
@@ -230,19 +229,28 @@ class PaymentController extends Controller
 
     public function demoOrderSuccess($id)
     {
-        $order = Order::with('user')->findOrFail($id);
+        $order = Order::with(['user', 'paket'])->findOrFail($id);
         if ($order->status !== 'pending') {
             return response()->json(['message' => 'Order already processed'], 400);
         }
 
         $order->status = 'dibayar';
         $order->save();
+
+        try {
+            if ($order->user && $order->paket) {
+                \App\Services\WhatsAppService::sendOrderNotification($order->user, $order, $order->paket);
+            }
+        } catch (\Exception $e) {
+            Log::error('Gagal kirim WA order success: ' . $e->getMessage());
+        }
+
         return response()->json(['message' => 'Demo order payment success']);
     }
 
     public function demoBillingSuccess($id)
     {
-        $billing = Billing::with('order')->findOrFail($id);
+        $billing = Billing::with(['order', 'order.paket', 'user'])->findOrFail($id);
         if ($billing->status === 'paid') {
             return response()->json(['message' => 'Billing already paid'], 400);
         }
@@ -262,6 +270,15 @@ class PaymentController extends Controller
             $mikrotikService->enablePppoeSecret($billing->order->mikrotik_username);
         }
         $billing->save();
+
+        try {
+            if ($billing->user) {
+                \App\Services\WhatsAppService::sendBillingNotification($billing->user, $billing);
+            }
+        } catch (\Exception $e) {
+            Log::error('Gagal kirim WA billing success: ' . $e->getMessage());
+        }
+
         return response()->json(['message' => 'Demo billing payment success']);
     }
 }

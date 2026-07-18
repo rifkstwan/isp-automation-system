@@ -10,8 +10,9 @@ class TechnicianScheduleController extends Controller
 {
     public function mySchedules(Request $request)
     {
-        $schedules = TechnicianSchedule::with(['ticket', 'order', 'order.paket'])
+        $schedules = TechnicianSchedule::with(['ticket', 'order', 'order.user', 'order.paket'])
             ->where('user_id', $request->user()->id)
+            ->orWhere('nama_teknisi', $request->user()->name)
             ->orderBy('tanggal_kunjungan', 'desc')
             ->get();
             
@@ -32,8 +33,9 @@ class TechnicianScheduleController extends Controller
         // Map to match the expected format for TechnicianInstallationsPage
         $installations = $schedules->map(function ($schedule) {
             $order = $schedule->order;
-            // Attach the schedule ID so the frontend can update the schedule status!
+            // Attach the schedule ID and status so the frontend can display and update schedule status!
             $order->schedule_id = $schedule->id; 
+            $order->schedule_status = $schedule->status;
             // We set status to aktif so the frontend activeInstallations filter passes
             $order->status = 'aktif';
             return $order;
@@ -71,7 +73,7 @@ class TechnicianScheduleController extends Controller
         if ($request->ticket_id) {
             $ticket = \App\Models\Ticket::findOrFail($request->ticket_id);
             $userId = $ticket->user_id;
-            $ticket->update(['status' => 'Diproses']);
+            $ticket->update(['status' => 'diproses']);
             $title = 'Jadwal Kunjungan Teknisi (Perbaikan)';
             $message = 'Teknisi ' . $request->nama_teknisi . ' telah dijadwalkan untuk kunjungan pada tanggal ' . \Carbon\Carbon::parse($request->tanggal_kunjungan)->format('d/m/Y') . ' terkait tiket gangguan Anda.';
         } elseif ($request->order_id) {
@@ -102,7 +104,7 @@ class TechnicianScheduleController extends Controller
             $request->nama_teknisi,
             'Tugas Kunjungan Baru',
             'Anda dijadwalkan untuk kunjungan pada tanggal ' . \Carbon\Carbon::parse($request->tanggal_kunjungan)->format('d/m/Y') . ' (' . ($request->ticket_id ? 'Tiket #'.$request->ticket_id : 'Order #'.$request->order_id) . ')',
-            'ticket_update'
+            $request->ticket_id ? 'ticket_update' : 'order_update'
         );
 
         return response()->json($schedule, 201);
@@ -111,17 +113,46 @@ class TechnicianScheduleController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:menunggu,selesai,dibatalkan',
+            'status'            => 'required|in:menunggu,berangkat,pengerjaan,selesai,dibatalkan',
+            'network_device_id' => 'nullable|exists:network_devices,id',
+            'foto'              => 'nullable|image|max:5120',
         ]);
 
-        $schedule = TechnicianSchedule::findOrFail($id);
+        $schedule = TechnicianSchedule::with(['order', 'order.user', 'order.paket'])->findOrFail($id);
+
+        $fotoPath = null;
+        if ($request->hasFile('foto')) {
+            $fotoPath = $request->file('foto')->store('installations', 'public');
+            $schedule->foto = $fotoPath;
+        }
+
         $schedule->update([
             'status' => $request->status,
         ]);
 
+        if ($fotoPath && $schedule->order) {
+            $schedule->order->foto = $fotoPath;
+            $schedule->order->save();
+        }
+
+        // If technician linked to an existing ODP/Router, save it to the order now
+        if ($request->status === 'selesai' && $request->network_device_id && $schedule->order) {
+            $schedule->order->network_device_id = $request->network_device_id;
+            $schedule->order->save();
+        }
+
         // If schedule is finished, maybe update ticket?
         if ($request->status === 'selesai' && $schedule->ticket) {
             $schedule->ticket->update(['status' => 'selesai']);
+        }
+
+        // Send WA notification if technician is en route
+        if ($request->status === 'berangkat' && $schedule->user) {
+            try {
+                \App\Services\WhatsAppService::sendTechnicianEnRouteNotification($schedule->user, $schedule);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Gagal kirim WA teknisi berangkat: ' . $e->getMessage());
+            }
         }
 
         // Aktivasi Order jika jadwal ini adalah pemasangan baru
@@ -149,8 +180,9 @@ class TechnicianScheduleController extends Controller
                 try {
                     $order->load(['user', 'paket']);
                     \Illuminate\Support\Facades\Mail::to($order->user->email)->send(new \App\Mail\OrderActivatedMail($order));
+                    \App\Services\WhatsAppService::sendInstallationCompletedNotification($order->user, $order);
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Gagal kirim email aktivasi setelah pemasangan: ' . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error('Gagal kirim notifikasi aktivasi setelah pemasangan: ' . $e->getMessage());
                 }
             }
         }

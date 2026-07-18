@@ -126,7 +126,7 @@ export function LoginPage() {
               <label className="remember-me">
                 <input type="checkbox" /> Remember me
               </label>
-              <a href="#" className="forgot-password">Lupa Password?</a>
+              <Link to="/forgot-password" className="forgot-password">Lupa Password?</Link>
             </div>
 
             <button type="submit" className="btn-login" disabled={loading}>

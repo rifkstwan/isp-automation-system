@@ -6,11 +6,24 @@ export type Schedule = {
   id: number
   user_id: number
   ticket_id: number | null
+  order_id?: number | null
   nama_teknisi: string
   tanggal_kunjungan: string
   status: "menunggu" | "berangkat" | "pengerjaan" | "selesai" | "dibatalkan"
   created_at: string
   ticket?: Ticket
+  order?: {
+    id: number
+    user?: {
+      id: number
+      name: string
+      email: string
+    }
+    paket?: {
+      id: number
+      nama: string
+    }
+  }
   user?: {
     id: number
     name: string

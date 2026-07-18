@@ -21,6 +21,7 @@ export function AdminTechniciansPage() {
   const [scheduleSearchTerm, setScheduleSearchTerm] = useState("")
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [newSchedule, setNewSchedule] = useState({ ticket_id: "", nama_teknisi: "", tanggal_kunjungan: "" })
+  const [jobType, setJobType] = useState<"instalasi" | "gangguan">("instalasi")
 
   // States for Account
   const [accountSearchTerm, setAccountSearchTerm] = useState("")
@@ -49,9 +50,15 @@ export function AdminTechniciansPage() {
   const updateAccount = useUpdateTechnicianAccount()
   const deleteAccount = useDeleteTechnicianAccount()
 
-  // Ambil tiket & order yang belum diselesaikan
-  const pendingTickets = tickets.filter(t => t.status === "menunggu")
-  const activeOrders = orders.filter((o: any) => o.status === "pending" || o.status === "dibayar" || o.status === "aktif")
+  // Ambil tiket & order yang belum dijadwalkan
+  const pendingTickets = tickets.filter(t => 
+    (t.status === "menunggu" || t.status === "diproses" || t.status === "dijadwalkan") && 
+    !schedules.some((s: any) => s.ticket_id === t.id)
+  )
+  const activeOrders = orders.filter((o: any) => 
+    (o.status === "pending" || o.status === "dibayar") && 
+    !schedules.some((s: any) => s.order_id === o.id)
+  )
 
   const filteredSchedules = schedules.filter((s: any) => {
     return s.nama_teknisi.toLowerCase().includes(scheduleSearchTerm.toLowerCase()) || 
@@ -185,7 +192,10 @@ export function AdminTechniciansPage() {
               />
             </div>
             <button 
-              onClick={() => setIsScheduleModalOpen(true)}
+              onClick={() => {
+                setJobType("instalasi")
+                setIsScheduleModalOpen(true)
+              }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
             >
               <Plus className="w-5 h-5" /> Buat Jadwal Baru
@@ -390,30 +400,70 @@ export function AdminTechniciansPage() {
             </div>
             <form onSubmit={handleCreateSchedule} className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Pilih Keluhan / Pemasangan Baru</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Tipe Pekerjaan</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJobType("instalasi")
+                      setNewSchedule({ ...newSchedule, ticket_id: "" })
+                    }}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      jobType === "instalasi"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-600 ring-2 ring-indigo-500/20"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Pemasangan Baru
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJobType("gangguan")
+                      setNewSchedule({ ...newSchedule, ticket_id: "" })
+                    }}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      jobType === "gangguan"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-600 ring-2 ring-indigo-500/20"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Perbaikan Gangguan
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                  {jobType === "instalasi" ? "Pilih Pemasangan Baru" : "Pilih Tiket Gangguan"}
+                </label>
                 <select
                   required
                   value={newSchedule.ticket_id}
                   onChange={e => setNewSchedule({ ...newSchedule, ticket_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm"
                 >
-                  <option value="">-- Pilih Pekerjaan --</option>
-                  <optgroup label="Instalasi Baru (Pemasangan)">
-                    {activeOrders.map((o: any) => (
-                      <option key={`ord-${o.id}`} value={`ord-${o.id}`}>
-                        [Instalasi] {o.user?.name} - {o.paket?.nama} ({o.alamat})
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Tiket Gangguan (Perbaikan)">
-                    {pendingTickets.map((t: any) => (
-                      <option key={`tkt-${t.id}`} value={`tkt-${t.id}`}>
-                        [Gangguan] {t.user?.name} - {t.judul}
-                      </option>
-                    ))}
-                  </optgroup>
+                  <option value="">
+                    {jobType === "instalasi" ? "-- Pilih Pelanggan (Pemasangan) --" : "-- Pilih Tiket Gangguan --"}
+                  </option>
+                  {jobType === "instalasi"
+                    ? activeOrders.map((o: any) => (
+                        <option key={`ord-${o.id}`} value={`ord-${o.id}`}>
+                          {o.user?.name} - {o.paket?.nama} ({o.alamat})
+                        </option>
+                      ))
+                    : pendingTickets.map((t: any) => (
+                        <option key={`tkt-${t.id}`} value={`tkt-${t.id}`}>
+                          {t.user?.name} - {t.judul}
+                        </option>
+                      ))}
                 </select>
-                {pendingTickets.length === 0 && activeOrders.length === 0 && <p className="text-xs text-amber-600 mt-1">Tidak ada pekerjaan yang membutuhkan teknisi saat ini.</p>}
+                {jobType === "instalasi" && activeOrders.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1.5">Tidak ada antrean pemasangan baru saat ini.</p>
+                )}
+                {jobType === "gangguan" && pendingTickets.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1.5">Tidak ada laporan gangguan yang belum ditugaskan.</p>
+                )}
               </div>
               
               <div>

@@ -30,6 +30,7 @@ export function AdminSettingsPage() {
       company_phone: '',
       tax_percentage: '0',
       maintenance_mode: 'false',
+      wa_enabled: 'true',
       wa_api_url: '',
       wa_api_key: '',
       smtp_host: '',
@@ -54,6 +55,7 @@ export function AdminSettingsPage() {
             company_phone: settings.company_phone || '',
             tax_percentage: settings.tax_percentage || '0',
             maintenance_mode: settings.maintenance_mode || 'false',
+            wa_enabled: settings.wa_enabled !== undefined ? settings.wa_enabled : 'true',
             wa_api_url: settings.wa_api_url || '',
             wa_api_key: settings.wa_api_key || '',
             smtp_host: settings.smtp_host || '',
@@ -340,12 +342,35 @@ export function AdminSettingsPage() {
                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col space-y-6">
                   <div className="border-b border-slate-100 pb-4">
                      <h2 className="text-lg font-bold text-slate-900">Integrasi WhatsApp</h2>
-                     <p className="text-sm text-slate-500 mt-1">Konfigurasi API Gateway untuk mengirim pesan otomatis ke pelanggan.</p>
+                     <p className="text-sm text-slate-500 mt-1">Konfigurasi API Gateway (Fonnte, Meta Official Cloud API, Wablas) untuk mengirim pesan otomatis ke pelanggan.</p>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-slate-100 bg-slate-50">
+                     <div className="flex gap-3">
+                        <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                           <h3 className="text-sm font-bold text-slate-800">Aktifkan Notifikasi WhatsApp</h3>
+                           <p className="text-xs text-slate-500 mt-1">Jika dimatikan, sistem tidak akan mengirimkan pesan WhatsApp (berguna saat pengujian/maintenance untuk mencegah spam).</p>
+                        </div>
+                     </div>
+                     <button
+                        type="button"
+                        onClick={() => handleToggle('wa_enabled')}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${formData.wa_enabled !== 'false' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                        role="switch"
+                        aria-checked={formData.wa_enabled !== 'false'}
+                     >
+                        <span className="sr-only">Toggle WhatsApp</span>
+                        <span
+                           aria-hidden="true"
+                           className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.wa_enabled !== 'false' ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
+                     </button>
                   </div>
                   
                   <div className="space-y-4">
                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700">URL Provider API WA</label>
+                        <label className="text-sm font-semibold text-slate-700">URL Endpoint Provider API WA</label>
                         <div className="relative">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                               <MessageCircle className="h-4 w-4 text-slate-400" />
@@ -356,13 +381,19 @@ export function AdminSettingsPage() {
                               value={formData.wa_api_url}
                               onChange={handleChange}
                               className="pl-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-colors"
-                              placeholder="Misal: https://api.fonnte.com/send"
+                              placeholder="Misal: https://graph.facebook.com/v19.0/PHONE_NUMBER_ID/messages atau https://api.fonnte.com/send"
                            />
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-600 space-y-1">
+                           <p className="font-bold text-slate-700">Contoh Format Provider:</p>
+                           <p>• <strong>Meta Official API (Resmi)</strong>: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-blue-600">https://graph.facebook.com/v19.0/[ID_TELEPON]/messages</code></p>
+                           <p>• <strong>Fonnte</strong>: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-blue-600">https://api.fonnte.com/send</code></p>
+                           <p>• <strong>Wablas</strong>: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-blue-600">https://pati.wablas.com/api/send-message</code></p>
                         </div>
                      </div>
 
                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700">API Key / Token</label>
+                        <label className="text-sm font-semibold text-slate-700">API Key / Permanent Access Token</label>
                         <div className="relative">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                               <Key className="h-4 w-4 text-slate-400" />
@@ -373,9 +404,10 @@ export function AdminSettingsPage() {
                               value={formData.wa_api_key}
                               onChange={handleChange}
                               className="pl-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-colors"
-                              placeholder="Masukkan API Token rahasia"
+                              placeholder="Masukkan Access Token / API Token rahasia"
                            />
                         </div>
+                        <p className="text-[11px] text-slate-500">Untuk Meta Official API, masukkan Permanent Access Token dari Meta App Dashboard.</p>
                      </div>
                   </div>
                </div>

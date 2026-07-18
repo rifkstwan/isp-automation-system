@@ -6,6 +6,7 @@ export type Testimonial = {
   user_id: number
   rating: number
   content: string
+  role?: string
   is_published: boolean
   created_at: string
   user?: {
@@ -50,7 +51,7 @@ export function useMyTestimonial() {
 export function useSubmitTestimonial() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { rating: number; content: string }) => {
+    mutationFn: async (data: { rating: number; content: string; role?: string }) => {
       const res = await api.post("/testimonials", data)
       return res.data
     },

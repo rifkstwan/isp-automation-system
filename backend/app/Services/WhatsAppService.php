@@ -21,10 +21,17 @@ class WhatsAppService
      */
     public static function sendMessage(string $phone, string $message): bool
     {
-        Log::channel('single')->info('=== WHATSAPP MESSAGE TRIGGERED ===');
+        Log::channel('single')->info('=== WHATSAPP MESSAGE QUEUE TRIGGERED ===');
         Log::channel('single')->info('To: ' . $phone);
         Log::channel('single')->info('Message: ' . $message);
         
+        // Cek apakah fitur WA diaktifkan
+        $waEnabled = Setting::where('key', 'wa_enabled')->value('value');
+        if ($waEnabled === 'false' || $waEnabled === '0') {
+            Log::channel('single')->info('WhatsApp sending is disabled in settings. Skipping sending to ' . $phone);
+            return false;
+        }
+
         $apiUrl = Setting::where('key', 'wa_api_url')->value('value');
         $apiKey = Setting::where('key', 'wa_api_key')->value('value');
 
@@ -33,9 +40,75 @@ class WhatsAppService
             return false;
         }
 
+        // Hitung jeda aman (minimal 30 - 60 detik acak per pesan untuk mencegah spam detection)
+        $now = now();
+        $lastScheduledAt = cache('last_whatsapp_scheduled_at');
+
+        $randomInterval = rand(30, 60); // Jeda acak 30-60 detik antar pesan
+        
+        $parsedLast = null;
+        if (is_string($lastScheduledAt)) {
+            try {
+                $parsedLast = \Carbon\Carbon::parse($lastScheduledAt);
+            } catch (\Throwable $e) {
+                $parsedLast = null;
+            }
+        } elseif ($lastScheduledAt instanceof \DateTimeInterface) {
+            $parsedLast = \Carbon\Carbon::instance($lastScheduledAt);
+        }
+
+        if ($parsedLast && $parsedLast->isFuture()) {
+            $newScheduledAt = $parsedLast->copy()->addSeconds($randomInterval);
+        } else {
+            $newScheduledAt = $now->copy()->addSeconds(10);
+        }
+
+        cache(['last_whatsapp_scheduled_at' => $newScheduledAt->toIso8601String()], now()->addMinutes(60));
+
+        $delaySeconds = max(0, $newScheduledAt->diffInSeconds($now));
+
+        \App\Jobs\SendWhatsApp::dispatch($phone, $message)->delay($delaySeconds);
+
+        Log::channel('single')->info("WhatsApp message queued for {$phone}. Delayed by {$delaySeconds} seconds.");
+        return true;
+    }
+
+    /**
+     * Mengirim pesan WhatsApp secara langsung via API HTTP.
+     * Dipanggil dari Laravel Queue Job SendWhatsApp.
+     */
+    public static function sendMessageDirectly(string $phone, string $message): bool
+    {
+        Log::channel('single')->info('=== SENDING WHATSAPP MESSAGE DIRECTLY ===');
+        Log::channel('single')->info('To: ' . $phone);
+        
+        $apiUrl = Setting::where('key', 'wa_api_url')->value('value');
+        $apiKey = Setting::where('key', 'wa_api_key')->value('value');
+
+        if (empty($apiUrl) || empty($apiKey)) {
+            Log::channel('single')->warning('WhatsApp API URL or Key is not configured.');
+            return false;
+        }
+
         try {
             // Deteksi provider berdasarkan URL
-            if (str_contains($apiUrl, 'fonnte.com')) {
+            if (str_contains($apiUrl, 'graph.facebook.com')) {
+                // === META OFFICIAL WHATSAPP CLOUD API ===
+                // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type'  => 'application/json',
+                ])->post($apiUrl, [
+                    'messaging_product' => 'whatsapp',
+                    'recipient_type'    => 'individual',
+                    'to'                 => self::formatPhone($phone),
+                    'type'               => 'text',
+                    'text'               => [
+                        'preview_url' => false,
+                        'body'        => $message,
+                    ],
+                ]);
+            } elseif (str_contains($apiUrl, 'fonnte.com')) {
                 // === FONNTE API ===
                 // Docs: https://docs.fonnte.com/
                 $response = Http::withHeaders([
@@ -200,4 +273,69 @@ class WhatsAppService
 
         self::sendMessage($user->phone, $message);
     }
+
+    /**
+     * Send a survey status update notification via WhatsApp to public survey applicant.
+     */
+    public static function sendSurveyNotification($survey)
+    {
+        if (empty($survey->phone)) return;
+
+        if ($survey->status === 'layak') {
+            $message = "Halo *{$survey->nama}*,\n\n"
+                     . "Permohonan survey lokasi Anda di:\n"
+                     . "Alamat: *{$survey->alamat}*\n\n"
+                     . "Telah diverifikasi *LAYAK & TERJANGKAU* oleh jaringan fiber optik CV. Citra Mandiri.\n\n"
+                     . "Silakan lakukan pendaftaran paket pilihan Anda melalui website kami. Terima kasih!";
+        } elseif ($survey->status === 'ditolak') {
+            $message = "Halo *{$survey->nama}*,\n\n"
+                     . "Mohon maaf, permohonan survey lokasi Anda di:\n"
+                     . "Alamat: *{$survey->alamat}*\n\n"
+                     . "Saat ini *BELUM TERJANGKAU* (Ditolak) oleh jaringan kabel/ODP CV. Citra Mandiri.\n\n"
+                     . "Kami terus memperluas area jaringan dan akan menghubungi Anda kembali jika lokasi Anda sudah dapat terlayani.";
+        } elseif ($survey->status === 'dijadwalkan') {
+            $tgl = $survey->tanggal_survey ? \Carbon\Carbon::parse($survey->tanggal_survey)->format('d/m/Y H:i') : '-';
+            $message = "Halo *{$survey->nama}*,\n\n"
+                     . "Permohonan survey lokasi Anda telah *DIJADWALKAN*.\n\n"
+                     . "Alamat: {$survey->alamat}\n"
+                     . "Teknisi: {$survey->nama_teknisi}\n"
+                     . "Tanggal Visit: {$tgl} WIB\n\n"
+                     . "Teknisi kami akan menghubungi Anda sebelum peninjauan lokasi. Terima kasih!";
+        } else {
+            return;
+        }
+
+        self::sendMessage($survey->phone, $message);
+    }
+
+    /**
+     * Send notification when technician is en route (berangkat).
+     */
+    public static function sendTechnicianEnRouteNotification($user, $schedule)
+    {
+        if (empty($user->phone)) return;
+
+        $message = "Halo {$user->name},\n\n"
+                 . "Teknisi kami *{$schedule->nama_teknisi}* saat ini sedang *BERANGKAT* menuju lokasi Anda.\n\n"
+                 . "Mohon pastikan Anda atau perwakilan berada di lokasi saat teknisi tiba. Terima kasih!";
+
+        self::sendMessage($user->phone, $message);
+    }
+
+    /**
+     * Send notification when new installation is completed and activated.
+     */
+    public static function sendInstallationCompletedNotification($user, $order)
+    {
+        if (empty($user->phone)) return;
+
+        $paketNama = $order->paket->nama ?? 'WiFi';
+        $message = "Halo {$user->name},\n\n"
+                 . "Pemasangan jaringan *{$paketNama}* di lokasi Anda telah *SELESAI & AKTIF*.\n\n"
+                 . "Username PPPoE: {$order->mikrotik_username}\n"
+                 . "Terima kasih telah mempercayakan layanan internet Anda kepada CV. Citra Mandiri.";
+
+        self::sendMessage($user->phone, $message);
+    }
 }
+

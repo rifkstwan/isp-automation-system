@@ -13,6 +13,7 @@ class Testimonial extends Model
         'user_id',
         'rating',
         'content',
+        'role',
         'is_published',
     ];
 

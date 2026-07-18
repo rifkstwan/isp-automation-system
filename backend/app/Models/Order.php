@@ -20,6 +20,9 @@ class Order extends Model
         'total_harga',
         'ip_address',
         'tipe_perangkat',
+        'mikrotik_username',
+        'mikrotik_password',
+        'network_device_id',
     ];
 
     protected $casts = [
@@ -40,5 +43,10 @@ class Order extends Model
     public function upgradeRequests()
     {
         return $this->hasMany(UpgradeRequest::class);
+    }
+
+    public function networkDevice()
+    {
+        return $this->belongsTo(NetworkDevice::class);
     }
 }

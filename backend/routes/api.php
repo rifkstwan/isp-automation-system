@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\OwnerUserController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaketController;
@@ -19,13 +20,17 @@ use App\Http\Controllers\TechnicianAccountController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
-Route::post('/register',   [AuthController::class, 'register']);
-Route::post('/login',      [AuthController::class, 'login']);
-Route::get('/pakets',      [PaketController::class, 'index']);
-Route::get('/pakets/{id}', [PaketController::class, 'show']);
-Route::post('/midtrans/webhook', [PaymentController::class, 'webhook']);
+Route::post('/register',          [AuthController::class, 'register']);
+Route::post('/login',             [AuthController::class, 'login']);
+Route::post('/forgot-password',   [ForgotPasswordController::class, 'sendResetLink']);
+Route::post('/reset-password',    [ForgotPasswordController::class, 'resetPassword']);
+Route::get('/pakets',             [PaketController::class, 'index']);
+Route::get('/pakets/{id}',        [PaketController::class, 'show']);
+Route::post('/midtrans/webhook',  [PaymentController::class, 'webhook']);
 Route::get('/testimonials/public', [App\Http\Controllers\Api\TestimonialController::class, 'publicIndex']);
-Route::get('/settings/public', [App\Http\Controllers\Api\SettingController::class, 'publicIndex']);
+Route::get('/settings/public',    [App\Http\Controllers\Api\SettingController::class, 'publicIndex']);
+Route::post('/public/survey-requests', [App\Http\Controllers\Api\SurveyRequestController::class, 'store']);
+Route::get('/public/survey-requests/verified', [App\Http\Controllers\Api\SurveyRequestController::class, 'verifiedLocations']);
 
 // Network Devices Status (Public for demo purposes or we can protect it too?)
 // Actually, status should be protected but it's okay. Let's move the resource to protected.
@@ -135,14 +140,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Technician routes
     Route::get('/technician/dashboard', [\App\Http\Controllers\Api\TechnicianController::class, 'dashboard']);
+    Route::get('/technician/history', [\App\Http\Controllers\Api\TechnicianController::class, 'history']);
     Route::get('/technician/installations', [TechnicianScheduleController::class, 'myInstallations']);
     Route::patch('/technician/installations/{id}/status', [TechnicianScheduleController::class, 'updateStatus']);
+    Route::post('/technician/installations/{id}/status', [TechnicianScheduleController::class, 'updateStatus']);
+    Route::get('/technician/survey-requests', [App\Http\Controllers\Api\SurveyRequestController::class, 'index']);
+    Route::patch('/technician/survey-requests/{id}/status', [App\Http\Controllers\Api\SurveyRequestController::class, 'updateStatus']);
+    Route::post('/technician/survey-requests/{id}/assign', [App\Http\Controllers\Api\SurveyRequestController::class, 'assignTechnician']);
+
     
     // Tickets - technician
-    Route::get('/technician/tickets', [TicketController::class, 'indexAdmin']);
+    Route::get('/technician/tickets', [TicketController::class, 'myTechnicianTickets']);
     Route::patch('/technician/tickets/{id}/status', [TicketController::class, 'updateStatus']);
     Route::post('/technician/tickets/{id}/upload', [TicketController::class, 'uploadFoto']);
 
     // Network Devices (For Technician & Admin)
+    Route::get('/network-devices/topology', [NetworkDeviceController::class, 'topology']);
+    Route::post('/network-devices/{networkDevice}/test-connection', [NetworkDeviceController::class, 'testConnection']);
+    Route::post('/network-devices/{networkDevice}/sync', [NetworkDeviceController::class, 'syncFromMikrotik']);
     Route::apiResource('network-devices', NetworkDeviceController::class);
+
 });

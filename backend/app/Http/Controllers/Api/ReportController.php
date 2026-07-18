@@ -15,12 +15,11 @@ class ReportController extends Controller
         $period = $request->query('period', '6m');
 
         // Total pendapatan keseluruhan
-        $totalPendapatan = Order::where('status', 'aktif')
-            ->orWhere('status', 'selesai')
+        $totalPendapatan = Order::whereIn('status', ['dibayar', 'aktif', 'selesai'])
             ->sum('total_harga');
 
         // Pendapatan bulan ini
-        $pendapatanBulanIni = Order::whereIn('status', ['aktif', 'selesai'])
+        $pendapatanBulanIni = Order::whereIn('status', ['dibayar', 'aktif', 'selesai'])
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->sum('total_harga');
@@ -37,7 +36,7 @@ class ReportController extends Controller
         // Paket terlaris
         $paketTerlaris = Order::with('paket')
             ->select('paket_id', DB::raw('count(*) as total'))
-            ->whereIn('status', ['aktif', 'selesai'])
+            ->whereIn('status', ['dibayar', 'aktif', 'selesai'])
             ->groupBy('paket_id')
             ->orderByDesc('total')
             ->limit(5)
@@ -48,7 +47,7 @@ class ReportController extends Controller
             ]);
 
         // Pendapatan per waktu dinamis (7 hari, 1 bulan, 6 bulan, 1 tahun)
-        $queryData = Order::whereIn('status', ['aktif', 'selesai']);
+        $queryData = Order::whereIn('status', ['dibayar', 'aktif', 'selesai']);
 
         if ($period === '7d') {
             $queryData->where('created_at', '>=', now()->subDays(7))

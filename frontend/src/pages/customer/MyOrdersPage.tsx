@@ -4,6 +4,7 @@ import { useMyOrders } from "../../hooks/useOrders"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import api from "../../services/api"
 import { CreditCard, CalendarDays, MapPin, Wifi, CheckCircle2, AlertCircle, Loader2, FileText, ArrowRight } from "lucide-react"
+import { useMidtrans } from "../../hooks/useMidtrans"
 
 function formatRupiah(angka: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -33,6 +34,7 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; ic
 
 export function MyOrdersPage() {
   const { data: orders, isLoading } = useMyOrders()
+  const { isReady: isMidtransReady } = useMidtrans()
   const queryClient = useQueryClient()
   const [payingOrderId, setPayingOrderId] = useState<number | null>(null)
 
@@ -41,10 +43,16 @@ export function MyOrdersPage() {
       const res = await api.post(`/orders/${orderId}/pay`);
       return res.data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, orderId) => {
       if ((window as any).snap) {
         (window as any).snap.pay(data.snap_token, {
-          onSuccess: function() {
+          onSuccess: async function() {
+             try {
+               await api.post(`/orders/${orderId}/demo-pay-success`);
+             } catch (e) {
+               console.error(e);
+             }
+             alert("Pembayaran berhasil!");
              queryClient.invalidateQueries({ queryKey: ["my-orders"] });
           },
           onPending: function() {
@@ -54,7 +62,6 @@ export function MyOrdersPage() {
              alert("Pembayaran gagal!");
           },
           onClose: function() {
-             // User closed the popup
              queryClient.invalidateQueries({ queryKey: ["my-orders"] });
           }
         });
@@ -118,7 +125,7 @@ export function MyOrdersPage() {
           {orders?.map((order) => {
             const status = statusConfig[order.status] || statusConfig['pending'];
             const StatusIcon = status.icon;
-            const isPending = order.status === 'pending' || order.status === 'menunggu';
+            const isPending = order.status === 'pending';
 
             return (
               <div key={order.id} className="bg-white rounded-[24px] overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-200/60 transition-all hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] group">
@@ -151,9 +158,21 @@ export function MyOrdersPage() {
                            </div>
                            <div>
                               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Lokasi Pemasangan</p>
-                              <p className="text-[14px] font-semibold text-slate-700 leading-relaxed">{order.alamat}</p>
+                              <p className="text-[14px] font-semibold text-slate-700 leading-relaxed">{order.alamat?.replace(/(?:Link|Titik)\s*Maps:[\s\S]*/i, '').trim()}</p>
                            </div>
                         </div>
+
+                        {order.catatan && (
+                           <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm border border-slate-100">
+                                 <FileText className="w-4 h-4 text-slate-400" />
+                              </div>
+                              <div>
+                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan</p>
+                                 <p className="text-[14px] font-semibold text-slate-700 leading-relaxed">{order.catatan}</p>
+                              </div>
+                           </div>
+                        )}
 
                         {order.status === 'aktif' && order.tanggal_mulai && (
                            <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
@@ -184,11 +203,11 @@ export function MyOrdersPage() {
                            <div className="mt-6 pt-6 border-t border-slate-200/60">
                               <button 
                                  onClick={() => handlePay(order.id)}
-                                 disabled={payingOrderId === order.id}
+                                 disabled={payingOrderId === order.id || !isMidtransReady}
                                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-70 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_15px_-3px_rgba(0,0,0,0.2)] transition-all active:scale-95 text-[14px]"
                               >
                                  {payingOrderId === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                                 {payingOrderId === order.id ? "Memproses..." : "Bayar Sekarang"}
+                                 {!isMidtransReady ? "Memuat Gateway..." : payingOrderId === order.id ? "Memproses..." : "Bayar Sekarang"}
                               </button>
                            </div>
                         )}
