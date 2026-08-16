@@ -464,7 +464,7 @@ export function AdminNetworkPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      {['Pelanggan', 'Paket', 'PPPoE Username', 'IP Address', 'ODP/Router', 'Wilayah', 'Aktif s/d'].map(h => (
+                      {['Pelanggan', 'Paket', 'PPPoE Username', 'IP Address', 'ODP/Router', 'Wilayah', 'Status', 'Aktif s/d'].map(h => (
                         <th key={h} className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -506,6 +506,14 @@ export function AdminNetworkPage() {
                         </td>
                         <td className="px-4 py-3.5">
                           <span className="text-sm text-slate-600">{c.network_device?.wilayah || <span className="text-slate-300">—</span>}</span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-semibold ${
+                            c.status === 'suspend' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${c.status === 'suspend' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                            {c.status === 'suspend' ? 'Terisolir' : 'Aktif'}
+                          </span>
                         </td>
                         <td className="px-4 py-3.5">
                           <span className="text-xs text-slate-500">

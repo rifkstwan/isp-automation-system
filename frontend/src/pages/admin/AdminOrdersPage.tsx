@@ -407,14 +407,24 @@ export function AdminOrdersPage() {
                                   <ShieldAlert className="w-4 h-4" />
                                 </button>
                               ) : (
-                                <button 
-                                  onClick={() => handleAktif(order)}
-                                  disabled={updateStatus.isPending}
-                                  className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 border border-transparent hover:border-emerald-100"
-                                  title="Aktifkan Kembali"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button 
+                                    onClick={() => handleAktif(order)}
+                                    disabled={updateStatus.isPending}
+                                    className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 border border-transparent hover:border-emerald-100"
+                                    title="Aktifkan Kembali"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleTolak(order.id)}
+                                    disabled={updateStatus.isPending}
+                                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 border border-transparent hover:border-red-100"
+                                    title="Tolak / Pemutusan Permanen"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </>
                               )}
                               <button 
                                 onClick={() => {

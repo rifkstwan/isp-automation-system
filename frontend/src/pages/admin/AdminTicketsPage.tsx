@@ -8,7 +8,7 @@ type Ticket = {
   judul: string
   deskripsi: string
   prioritas: "rendah" | "sedang" | "tinggi"
-  status: "menunggu" | "diproses" | "selesai"
+  status: "menunggu" | "diproses" | "dijadwalkan" | "selesai" | "ditolak"
   foto: string | null
   created_at: string
   user: {
@@ -23,9 +23,11 @@ type Ticket = {
 import { WhatsAppTemplateModal, type RecipientInfo } from "../../components/WhatsAppTemplateModal"
 
 const statusConfig = {
-  menunggu: { label: "Menunggu", color: "bg-amber-100 text-amber-700 border-amber-200", icon: Clock },
-  diproses: { label: "Diproses", color: "bg-blue-100 text-blue-700 border-blue-200", icon: Wrench },
-  selesai:  { label: "Selesai",  color: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
+  menunggu:    { label: "Menunggu",    color: "bg-amber-100 text-amber-700 border-amber-200",   icon: Clock },
+  diproses:    { label: "Diproses",    color: "bg-blue-100 text-blue-700 border-blue-200",     icon: Wrench },
+  dijadwalkan: { label: "Dijadwalkan", color: "bg-purple-100 text-purple-700 border-purple-200", icon: Clock },
+  selesai:     { label: "Selesai",     color: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
+  ditolak:     { label: "Ditolak",     color: "bg-red-100 text-red-700 border-red-200",         icon: AlertTriangle },
 }
 
 const prioritasConfig = {
@@ -223,6 +225,10 @@ export function AdminTicketsPage() {
                       <div className="w-full py-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center gap-2 text-emerald-600 font-bold text-sm">
                         <CheckCircle2 className="w-5 h-5" /> Keluhan Selesai Diatasi
                       </div>
+                    ) : ticket.status === 'ditolak' ? (
+                      <div className="w-full py-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center gap-2 text-red-600 font-bold text-sm">
+                        <AlertTriangle className="w-5 h-5" /> Tiket Ditolak
+                      </div>
                     ) : (
                       <div className="flex gap-2">
                         {ticket.status === 'menunggu' && (
@@ -234,7 +240,7 @@ export function AdminTicketsPage() {
                             <Wrench className="w-4 h-4" /> Tandai Diproses
                           </button>
                         )}
-                        {ticket.status === 'diproses' && (
+                        {(ticket.status === 'diproses' || ticket.status === 'dijadwalkan') && (
                           <button
                             onClick={() => updateStatus.mutate({ id: ticket.id, status: 'selesai' })}
                             disabled={updateStatus.isPending}

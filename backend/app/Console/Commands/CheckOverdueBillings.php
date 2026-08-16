@@ -8,6 +8,9 @@ use App\Models\Billing;
 use App\Models\Notification;
 use App\Services\WhatsAppService;
 
+use App\Mail\OrderRejectedMail;
+use Illuminate\Support\Facades\Mail;
+
 class CheckOverdueBillings extends Command
 {
     /**
@@ -22,7 +25,7 @@ class CheckOverdueBillings extends Command
      *
      * @var string
      */
-    protected $description = 'Check for overdue billings and suspend active orders';
+    protected $description = 'Check for overdue billings, suspend active orders, and terminate 30+ days overdue orders';
 
     /**
      * Execute the console command.
@@ -31,13 +34,13 @@ class CheckOverdueBillings extends Command
     {
         $this->info('Mengecek tagihan yang sudah lewat jatuh tempo...');
 
-        // Cari tagihan unpaid yang jatuh temponya sudah lewat batas waktu (kemarin atau sebelumnya)
+        // 1. ISOLIR SEMENTARA: Cari tagihan unpaid yang jatuh temponya sudah lewat batas waktu (kemarin/sebelumnya)
         $billings = Billing::with(['order.user', 'user'])
             ->where('status', 'unpaid')
             ->whereDate('jatuh_tempo', '<', now()->toDateString())
             ->get();
 
-        $count = 0;
+        $suspendCount = 0;
 
         foreach ($billings as $billing) {
             $billing->update(['status' => 'overdue']);
@@ -55,9 +58,9 @@ class CheckOverdueBillings extends Command
                 // Kirim notifikasi isolir via in-app
                 Notification::create([
                     'user_id' => $billing->user_id,
-                    'title' => 'Layanan Diisolir',
+                    'title'   => 'Layanan Diisolir',
                     'message' => 'Layanan internet Anda sementara dinonaktifkan karena tagihan telah melewati jatuh tempo. Segera lunasi tagihan agar koneksi aktif kembali.',
-                    'type' => 'billing_overdue',
+                    'type'    => 'billing_overdue',
                 ]);
 
                 // Kirim WA isolir ke pelanggan
@@ -67,10 +70,62 @@ class CheckOverdueBillings extends Command
                     \Log::error('Gagal kirim WA isolir: ' . $e->getMessage());
                 }
 
-                $count++;
+                $suspendCount++;
             }
         }
 
-        $this->info("Berhasil mengisolir $count layanan yang menunggak.");
+        $this->info("Berhasil mengisolir $suspendCount layanan yang menunggak.");
+
+        // 2. PEMUTUSAN PERMANEN (DITOLAK): Cari tagihan overdue yang sudah menunggak >= 30 hari
+        $cutoffDate = now()->subDays(30)->toDateString();
+        $longOverdueBillings = Billing::with(['order.user', 'user'])
+            ->where('status', 'overdue')
+            ->whereDate('jatuh_tempo', '<=', $cutoffDate)
+            ->get();
+
+        $terminateCount = 0;
+
+        foreach ($longOverdueBillings as $billing) {
+            if ($billing->order && in_array($billing->order->status, ['suspend', 'aktif'])) {
+                $order = $billing->order;
+                $order->update(['status' => 'ditolak']);
+
+                // Pastikan koneksi MikroTik mati
+                if ($order->mikrotik_username) {
+                    $mikrotikService = new \App\Services\MikrotikService();
+                    $mikrotikService->disablePppoeSecret($order->mikrotik_username);
+                }
+
+                // Kirim notifikasi in-app
+                Notification::create([
+                    'user_id' => $billing->user_id,
+                    'title'   => 'Layanan Diputus Permanen',
+                    'message' => 'Layanan internet Anda telah diputus secara permanen karena menunggak tagihan lebih dari 30 hari. Data Anda dikeluarkan dari peta topologi aktif.',
+                    'type'    => 'order_rejected',
+                ]);
+
+                // Kirim Email pemberitahuan pemutusan permanen
+                if ($order->user && $order->user->email) {
+                    try {
+                        Mail::to($order->user->email)->send(new OrderRejectedMail($order));
+                    } catch (\Exception $e) {
+                        \Log::error('Gagal kirim email pemutusan permanen: ' . $e->getMessage());
+                    }
+                }
+
+                // Kirim Notifikasi WhatsApp pemutusan permanen
+                if ($order->user) {
+                    try {
+                        WhatsAppService::sendTerminationNotification($order->user, $billing);
+                    } catch (\Exception $e) {
+                        \Log::error('Gagal kirim WA pemutusan permanen: ' . $e->getMessage());
+                    }
+                }
+
+                $terminateCount++;
+            }
+        }
+
+        $this->info("Berhasil memutus permanen $terminateCount layanan yang menunggak > 30 hari.");
     }
 }

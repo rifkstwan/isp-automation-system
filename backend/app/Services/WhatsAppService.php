@@ -275,6 +275,22 @@ class WhatsAppService
     }
 
     /**
+     * Send permanent termination notification to the user when overdue >= 30 days.
+     */
+    public static function sendTerminationNotification($user, $billing)
+    {
+        if (empty($user->phone)) return;
+
+        $formattedTotal = "Rp " . number_format($billing->jumlah_tagihan, 0, ',', '.');
+
+        $message = "Halo {$user->name},\n\n"
+                 . "Layanan internet Anda telah *DIPUTUSKAN PERMANEN* karena tagihan sebesar {$formattedTotal} telah menunggak lebih dari 30 hari dari tanggal jatuh tempo.\n\n"
+                 . "Data Anda telah dikeluarkan dari topologi jaringan aktif. Silakan hubungi admin jika ingin mendaftar ulang.";
+
+        self::sendMessage($user->phone, $message);
+    }
+
+    /**
      * Send a survey status update notification via WhatsApp to public survey applicant.
      */
     public static function sendSurveyNotification($survey)

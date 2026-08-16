@@ -97,16 +97,17 @@ class NetworkDeviceController extends Controller
             });
 
 
-        // Active customers summary
+        // Customers summary (Aktif & Suspend/Terisolir)
         $activeOrders = Order::with(['user', 'paket', 'networkDevice'])
-            ->where('status', 'aktif')
+            ->whereIn('status', ['aktif', 'suspend'])
             ->get()
             ->map(function ($order) {
                 return [
                     'order_id'          => $order->id,
                     'customer_name'     => $order->user->name ?? '-',
                     'customer_phone'    => $order->user->phone ?? '-',
-                    'paket'             => $order->paket->nama_paket ?? '-',
+                    'paket'             => $order->paket->nama_paket ?? $order->paket->nama ?? '-',
+                    'status'            => $order->status,
                     'mikrotik_username' => $order->mikrotik_username,
                     'ip_address'        => $order->ip_address,
                     'tanggal_mulai'     => $order->tanggal_mulai,
@@ -306,14 +307,14 @@ class NetworkDeviceController extends Controller
             'children'     => [],
         ];
 
-        // Attach active customers connected to this device/ODP
+        // Attach customers connected to this device/ODP (aktif & suspend)
         if ($device->relationLoaded('orders')) {
-            $node['customers'] = $device->orders->where('status', 'aktif')->map(function ($order) {
+            $node['customers'] = $device->orders->whereIn('status', ['aktif', 'suspend'])->map(function ($order) {
                 return [
                     'order_id'          => $order->id,
                     'customer_name'     => $order->user->name ?? '-',
                     'customer_phone'    => $order->user->phone ?? '-',
-                    'paket'             => $order->paket->nama_paket ?? '-',
+                    'paket'             => $order->paket->nama_paket ?? $order->paket->nama ?? '-',
                     'mikrotik_username' => $order->mikrotik_username,
                     'ip_address'        => $order->ip_address,
                     'status'            => $order->status,
