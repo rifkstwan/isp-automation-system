@@ -1,11 +1,10 @@
-import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 import { Wrench, Package, MapPin, CheckCircle2, Navigation } from "lucide-react"
 import api from "../../services/api"
 
 export function TechnicianDashboardPage() {
-  const { data: dashboardData, isLoading: isLoadingStats } = useQuery({
+  const { data: dashboardData } = useQuery({
     queryKey: ["technician-dashboard-stats"],
     queryFn: async () => {
       const res = await api.get(`/technician/dashboard?t=${new Date().getTime()}`)

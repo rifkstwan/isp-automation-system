@@ -87,7 +87,7 @@ export function AdminReportsPage() {
       ],
       theme: 'plain',
       headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 6, borderBottomWidth: 0.1, borderBottomColor: [226, 232, 240] }
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.1 }
     })
 
     const finalY1 = (doc as any).lastAutoTable.finalY || 100
@@ -103,7 +103,7 @@ export function AdminReportsPage() {
       ],
       theme: 'plain',
       headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 6, borderBottomWidth: 0.1, borderBottomColor: [226, 232, 240] }
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.1 }
     })
 
     const finalY2 = (doc as any).lastAutoTable.finalY || 150
@@ -116,7 +116,7 @@ export function AdminReportsPage() {
       body: paketBody.length > 0 ? paketBody : [['-', 'Tidak ada data', '-']],
       theme: 'plain',
       headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 6, borderBottomWidth: 0.1, borderBottomColor: [226, 232, 240] }
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 232, 240], lineWidth: 0.1 }
     })
 
     doc.save("Laporan-Ringkasan.pdf")
@@ -267,7 +267,7 @@ export function AdminReportsPage() {
                    width={70}
                 />
                 <Tooltip 
-                   formatter={(value: number) => [formatCurrency(value), "Pendapatan"]}
+                   formatter={(value: any) => [formatCurrency(Number(value) || 0), "Pendapatan"]}
                    labelStyle={{ fontWeight: '600', color: '#0f172a' }}
                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '13px' }}
                 />
@@ -305,11 +305,11 @@ export function AdminReportsPage() {
                 />
                 <Tooltip 
                    cursor={{fill: '#f8fafc'}}
-                   formatter={(value: number) => [`${value} Langganan`, "Total"]}
+                   formatter={(value: any) => [`${value} Langganan`, "Total"]}
                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '13px' }}
                 />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={24}>
-                  {report.paket_terlaris.map((entry, index) => (
+                  {report.paket_terlaris.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>

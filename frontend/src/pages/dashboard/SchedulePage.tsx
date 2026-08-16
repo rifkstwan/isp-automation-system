@@ -4,11 +4,6 @@ import { CalendarDays, Clock, User, CheckCircle2, Wrench, Navigation, XCircle, L
 export function SchedulePage() {
   const { data: schedules, isLoading } = useSchedules()
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      weekday: "long", day: "2-digit", month: "long", year: "numeric"
-    })
-  }
 
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString("id-ID", {

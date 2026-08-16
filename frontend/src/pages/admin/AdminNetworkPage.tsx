@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  Activity, Wifi, Server, Cpu, Clock, CheckCircle2, XCircle, AlertTriangle,
+  Activity, Wifi, Server, Cpu, CheckCircle2, XCircle,
   RefreshCw, Layers, Globe, Plus, Trash2, ChevronDown, ChevronRight, Users,
-  Network, Zap, MapPin, User, RouterIcon, Loader2, WifiOff, Signal,
+  Network, Zap, MapPin, Loader2, WifiOff, Signal,
 } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import api from "../../services/api"

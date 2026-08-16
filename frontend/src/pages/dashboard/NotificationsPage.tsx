@@ -5,19 +5,6 @@ export function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications()
   const markAsRead = useMarkNotificationRead()
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const days = Math.floor(hours / 24)
-
-    if (hours < 1) return "Baru saja"
-    if (hours < 24) return `${hours} jam yang lalu`
-    if (days === 1) return "Kemarin"
-    if (days < 7) return `${days} hari yang lalu`
-    return date.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-  }
 
   const getIcon = (type: string) => {
     switch (type) {

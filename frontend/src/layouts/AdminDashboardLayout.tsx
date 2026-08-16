@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useRef } from "react"
+import { type ReactNode, useState, useEffect, useRef } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { useNotifications } from "../hooks/useNotifications"
@@ -19,15 +19,12 @@ import {
   PieChart,
   Settings,
   LogOut,
-  ChevronDown,
   Search,
   Menu,
   X,
-  Smartphone,
   User,
   Activity,
-  Star,
-  FileText
+  Star
 } from "lucide-react"
 import logoImg from "../assets/profile.jpg"
 

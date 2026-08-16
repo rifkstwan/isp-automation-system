@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import api from "../../services/api"
-import { ArrowUpCircle, CheckCircle2, XCircle, Search, Filter } from "lucide-react"
+import { ArrowUpCircle, CheckCircle2, XCircle } from "lucide-react"
 
 export function AdminUpgradesPage() {
   const [upgrades, setUpgrades] = useState<any[]>([])

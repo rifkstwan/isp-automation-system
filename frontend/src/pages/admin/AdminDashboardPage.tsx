@@ -169,7 +169,7 @@ export function AdminDashboardPage() {
                  <Tooltip 
                    cursor={{ fill: '#f8fafc' }}
                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                   formatter={(value: number) => [formatRupiah(value), "Pendapatan"]}
+                   formatter={(value: any) => [formatRupiah(Number(value) || 0), "Pendapatan"]}
                  />
                  <Bar 
                    dataKey="total" 
@@ -200,8 +200,9 @@ export function AdminDashboardPage() {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
+                    label={false}
                   >
-                    {statusPieData.map((entry, index) => (
+                    {statusPieData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
