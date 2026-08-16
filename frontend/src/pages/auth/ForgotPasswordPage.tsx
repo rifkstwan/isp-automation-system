@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import api from "../../services/api"
+import logoImg from "../../assets/profile.jpg"
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -63,7 +64,7 @@ export function ForgotPasswordPage() {
           {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: "32px" }}>
             <img
-              src="/src/assets/profile.jpg"
+              src={logoImg}
               alt="Logo CV Citra Mandiri"
               style={{
                 width: "64px", height: "64px", borderRadius: "16px",

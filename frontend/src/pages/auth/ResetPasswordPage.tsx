@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import api from "../../services/api"
+import logoImg from "../../assets/profile.jpg"
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -80,7 +81,7 @@ export function ResetPasswordPage() {
           {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: "32px" }}>
             <img
-              src="/src/assets/profile.jpg"
+              src={logoImg}
               alt="Logo CV Citra Mandiri"
               style={{
                 width: "64px", height: "64px", borderRadius: "16px",

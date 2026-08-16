@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
 import "./LoginPage.css"
 import bgImage from "../../assets/bg-login.jpeg"
+import logoImg from "../../assets/profile.jpg"
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -73,7 +74,7 @@ export function LoginPage() {
       <div className="login-form-section">
         <div className="login-left-inner">
           <div className="login-logo-container">
-            <img src="/src/assets/profile.jpg" alt="Logo" className="login-logo-img" />
+            <img src={logoImg} alt="Logo" className="login-logo-img" />
             <span className="login-logo-text">CV.Citra Mandiri</span>
           </div>
 

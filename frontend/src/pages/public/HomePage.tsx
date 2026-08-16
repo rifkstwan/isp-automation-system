@@ -5,6 +5,7 @@ import api from "../../services/api"
 import { usePublicTestimonials } from "../../hooks/useTestimonials"
 import { Star, Wifi, Rocket, Zap, Shield, Crown, MapPin, Loader2, Compass, CheckCircle2, X, Navigation, Phone, User, Mail } from "lucide-react"
 import "./HomePage.css"
+import logoImg from "../../assets/profile.jpg"
 
 declare global {
   interface Window {
@@ -453,7 +454,7 @@ export function HomePage() {
         <nav className="lp-nav">
           <Link to="/" className="lp-brand">
             <img
-              src="/src/assets/profile.jpg"
+              src={logoImg}
               alt="CV. Citra Mandiri"
               className="lp-brand-img"
             />
@@ -1360,7 +1361,7 @@ export function HomePage() {
             {/* Column 1: Brand */}
             <div className="footer-brand">
               <div className="footer-logo-wrapper">
-                <img src="/src/assets/profile.jpg" alt="Logo CV. Citra Mandiri" className="footer-logo" />
+                <img src={logoImg} alt="Logo CV. Citra Mandiri" className="footer-logo" />
                 <span className="footer-brand-name">CV. Citra Mandiri</span>
               </div>
               <p className="footer-desc">
